@@ -203,18 +203,33 @@ class message_launch {
 
         // Login user.
 
-        // TODO Replace basic outcomes vars with AGS specific vars and update code below.
+        // Record the user_id, platformid (issuer) and servicedata for later use in grade sync.
+        $data = $this->launchdata->get_launch_data();
         //$sourceid = $this->user->ltiResultSourcedId;
         //$serviceurl = $this->resourceLink->getSetting('lis_outcome_service_url');
+        $serviceurl = null;
+        if ($this->launchdata->has_ags()) {
+            $serviceurl = json_encode($data['https://purl.imsglobal.org/spec/lti-ags/claim/endpoint']);
+        }
 
         // Check if we have recorded this user before.
+        // TODO: We may not end up needing resource link id, since the service data contains relevant line item urls.
+        $sourceid = json_encode([
+            'resourcelinkid' => $data['https://purl.imsglobal.org/spec/lti/claim/resource_link']['id'],
+            'userid' => $data['sub']
+        ]);
+
+        $platformid = $data['iss'];
         if ($userlog = $DB->get_record('enrol_lti_users', ['toolid' => $this->contentitem->id, 'userid' => $user->id])) {
-            /*if ($userlog->sourceid != $sourceid) {
+            if ($userlog->sourceid != $sourceid) {
                 $userlog->sourceid = $sourceid;
             }
             if ($userlog->serviceurl != $serviceurl) {
                 $userlog->serviceurl = $serviceurl;
-            }*/
+            }
+            if ($userlog->platformid != $platformid) {
+                $userlog->platformid = $platformid;
+            }
             $userlog->lastaccess = time();
             $DB->update_record('enrol_lti_users', $userlog);
         } else {
@@ -222,8 +237,9 @@ class message_launch {
             $userlog = new \stdClass();
             $userlog->userid = $user->id;
             $userlog->toolid = $this->contentitem->id;
-            $userlog->serviceurl = null;//$serviceurl;
-            $userlog->sourceid = null;//$sourceid;
+            $userlog->serviceurl = $serviceurl;
+            $userlog->sourceid = $sourceid;
+            $userlog->platformid = $platformid;
             $userlog->consumerkey = null;//$this->consumer->getKey();
             $userlog->consumersecret = null;//$tool->secret;
             $userlog->lastgrade = 0;

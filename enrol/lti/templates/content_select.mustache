@@ -21,11 +21,16 @@
             <input type="hidden" name="launchid" value="{{launchid}}">
             <input type="hidden" name="sesskey" value="{{sesskey}}">
             <table id="treegrid" class="table" role="treegrid" aria-label="Published content selection form">
+                <colgroup>
+                    <col width="60%">
+                    <col width="20%">
+                    <col width="20%">
+                </colgroup>
                 <thead>
                     <tr>
                         <th class="header" scope="col"></th>
                         <th class="header" scope="col">Add to course</th>
-                        <!--th class="header" scope="col">Grade support</th-->
+                        <th class="header" scope="col">Add to gradebook</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -35,13 +40,18 @@
                                 {{fullname}}
                             </td>
                             <td role="gridcell"></td>
-                            <!--td role="gridcell"></td-->
+                            <td role="gridcell"></td>
                         </tr>
                         {{#modules}}
                             <tr role="row" aria-level="2" class="">
                                 <td role="gridcell">{{name}}</td>
                                 <td role="gridcell"><input type="checkbox" name="modules[]" value="{{id}}"></td>
-                                <!--td role="gridcell"><a href="#">test</a></td-->
+                                {{#lineitem}}
+                                <td role="gridcell"><input type="checkbox" name="grades[]" value="{{id}}"></td>
+                                {{/lineitem}}
+                                {{^lineitem}}
+                                <td role="gridcell">-</td>
+                                {{/lineitem}}
                             </tr>
                         {{/modules}}
                     {{/courses}}

@@ -24,6 +24,8 @@
 
 namespace enrol_lti\task;
 
+use enrol_lti\local\ltiadvantage\issuer_database;
+
 /**
  * Task for synchronising grades for the enrolment LTI.
  *
@@ -40,6 +42,146 @@ class sync_grades extends \core\task\scheduled_task {
      */
     public function get_name() {
         return get_string('tasksyncgrades', 'enrol_lti');
+    }
+
+    /**
+     * Sync grades to the platform using the Assignment and Grade Services.
+     *
+     * @param $tool
+     * @throws \coding_exception
+     * @throws \dml_exception
+     */
+    protected function sync_grades_lti_advantage($tool) {
+        global $DB;
+        $usercount = 0;
+        $sendcount = 0;
+
+        if ($ltiusers = $DB->get_records('enrol_lti_users', array('toolid' => $tool->id), 'lastaccess DESC')) {
+            $completion = new \completion_info(get_course($tool->courseid));
+            foreach ($ltiusers as $ltiuser) {
+                $mtracecontent = "for the user '$ltiuser->userid' in the tool '$tool->id' for the course " .
+                    "'$tool->courseid'";
+
+                $usercount = $usercount + 1;
+
+                // Check if we do not have a serviceurl - this can happen if the sync process has an unexpected error.
+                if (empty($ltiuser->serviceurl)) {
+                    mtrace("Skipping - Empty serviceurl $mtracecontent.");
+                    continue;
+                }
+
+                // Need a valid context to continue.
+                if (!$context = \context::instance_by_id($tool->contextid, IGNORE_MISSING)) {
+                    mtrace("Failed - Invalid contextid '$tool->contextid' for the tool '$tool->id'.");
+                    continue;
+                }
+
+                // Ok, let's get the grade.
+                $grade = false;
+                $dategraded = false;
+                if ($context->contextlevel == CONTEXT_COURSE) {
+                    // Check if the user did not completed the course when it was required.
+                    if ($tool->gradesynccompletion && !$completion->is_course_complete($ltiuser->userid)) {
+                        mtrace("Skipping - Course not completed $mtracecontent.");
+                        continue;
+                    }
+
+                    // Get the grade.
+                    if ($grade = grade_get_course_grade($ltiuser->userid, $tool->courseid)) {
+                        $grademax = floatval($grade->item->grademax);
+                        $dategraded = $grade->dategraded;
+                        $grade = $grade->grade;
+                    }
+                } else if ($context->contextlevel == CONTEXT_MODULE) {
+                    $cm = get_coursemodule_from_id(false, $context->instanceid, 0, false, MUST_EXIST);
+
+                    if ($tool->gradesynccompletion) {
+                        $data = $completion->get_data($cm, false, $ltiuser->userid);
+                        if ($data->completionstate != COMPLETION_COMPLETE_PASS &&
+                            $data->completionstate != COMPLETION_COMPLETE) {
+                            mtrace("Skipping - Activity not completed $mtracecontent.");
+                            continue;
+                        }
+                    }
+
+                    $grades = grade_get_grades($cm->course, 'mod', $cm->modname, $cm->instance, $ltiuser->userid);
+                    if (!empty($grades->items[0]->grades)) {
+                        $grade = reset($grades->items[0]->grades);
+                        if (!empty($grade->item)) {
+                            $grademax = floatval($grade->item->grademax);
+                        } else {
+                            $grademax = floatval($grades->items[0]->grademax);
+                        }
+                        $dategraded = $grade->dategraded;
+                        $grade = $grade->grade;
+                    }
+                }
+
+                if ($grade === false || $grade === null || strlen($grade) < 1) {
+                    mtrace("Skipping - Invalid grade $mtracecontent.");
+                    continue;
+                }
+
+                // No need to be dividing by zero.
+                if (empty($grademax)) {
+                    mtrace("Skipping - Invalid grade $mtracecontent.");
+                    continue;
+                }
+
+                // Check to see if the grade has changed.
+                if (!grade_floats_different($grade, $ltiuser->lastgrade)) {
+                    mtrace("Not sent - The grade $mtracecontent was not sent as the grades are the same.");
+                    continue;
+                }
+
+                // Sync with the platform.
+                $floatgrade = $grade / $grademax;
+
+                try {
+                    // Get the platform registration details by looking up the platformid.
+                    $registration = (new issuer_database())->find_registration_by_issuer($ltiuser->platformid);
+                    $sc = new \IMSGlobal\LTI13\LTI_Service_Connector($registration);
+
+                    // TODO: consider whether serviceurl is appropriate here, since we're storing service caps too.
+                    $servicedata = (array)json_decode($ltiuser->serviceurl);
+                    if (empty($servicedata)) {
+                        // There was no AGS support when the user launched, so skip this.
+                        mtrace("Not sent - The grade $mtracecontent was not sent as no AGS endpoint could be found.");
+                        continue;
+                    }
+
+                    // TODO: if we don't end up needing the resourceLinkId, then remove it from the sourceid json.
+                    $sourcedata = json_decode($ltiuser->sourceid);
+
+                    $ags = new \IMSGlobal\LTI13\LTI_Assignments_Grades_Service($sc, $servicedata);
+                    $grade = \IMSGlobal\LTI13\LTI_Grade::new()
+                        ->set_score_given($grade)
+                        ->set_score_maximum($grademax)
+                        ->set_user_id($sourcedata->userid)
+                        ->set_timestamp(date(\DateTime::ISO8601, $dategraded))
+                        ->set_activity_progress('Completed')
+                        ->set_grading_progress('FullyGraded');
+
+                    // Don't specify the line item. The default line item will be used.
+                    $response = $ags->put_grade($grade);
+                } catch (\Exception $e) {
+                    mtrace("Failed - The grade '$floatgrade' $mtracecontent failed to send.");
+                    mtrace($e->getMessage());
+                    continue;
+                }
+
+                $httpheader = $response['headers'][0];
+                $responsecode = explode(' ', $httpheader)[1];
+                if ($responsecode == '200') {
+                    $DB->set_field('enrol_lti_users', 'lastgrade', grade_floatval($grade), array('id' => $ltiuser->id));
+                    mtrace("Success - The grade '$floatgrade' $mtracecontent was sent.");
+                    $sendcount = $sendcount + 1;
+                } else {
+                    mtrace("Failed - The grade '$floatgrade' $mtracecontent failed to send.");
+                    mtrace("Header: $httpheader");
+                }
+            }
+        }
     }
 
     /**
@@ -73,6 +215,11 @@ class sync_grades extends \core\task\scheduled_task {
         if ($tools = \enrol_lti\helper::get_lti_tools(array('status' => ENROL_INSTANCE_ENABLED, 'gradesync' => 1))) {
             foreach ($tools as $tool) {
                 mtrace("Starting - Grade sync for shared tool '$tool->id' for the course '$tool->courseid'.");
+                if ($tool->ltiversion == 'LTI-1p3') {
+                    mtrace("LTI Advantage tool: yes. Syncing via AGS.");
+                    $this->sync_grades_lti_advantage($tool);
+                    continue;
+                }
 
                 // Variables to keep track of information to display later.
                 $usercount = 0;

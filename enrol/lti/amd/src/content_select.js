@@ -550,6 +550,22 @@ function TreeGrid (treegridElem, doAllowRowFocus, doStartRowFocus) {
         onFocusIn, true);
 }
 
+// Register the checkbox change events allowing the automatic selection/deselection of the
+// 'add to gradebook' checkbox when selecting an activity/resource.
+const register_event_handlers = () => {
+    document.addEventListener('change', e => {
+        const checkbox = e.target.closest("input[type='checkbox'][name^='modules']");
+        if (!checkbox) {
+            return;
+        }
+        const id = checkbox.value;
+        const gradecheckbox = document.querySelector("input[type='checkbox'][name^='grades'][value='"+id+"']");
+        gradecheckbox.checked = checkbox.checked;
+
+    });
+};
+
 export const init = () =>  {
+    register_event_handlers();
     return new TreeGrid(document.querySelector('#treegrid'), false, false);
 };

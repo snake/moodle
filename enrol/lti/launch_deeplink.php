@@ -77,7 +77,7 @@ require_login();
 
 
 
-// comment out the above and uncomment this to let the page load without requiring a deep link launch.
+// TODO: TESTING ONLY: comment out the above and uncomment this to let the page load without requiring a deep link launch.
 /*$launchid= 1;
 $PAGE->set_context(context_system::instance());
 $PAGE->set_url('/enrol/lti/launch_deeplink.php?launchid='.$launchid);
@@ -124,6 +124,7 @@ $sql = "SELECT elt.id AS enrol_lti_id, e.id AS enrol_id, e.name AS name, e.cours
       ORDER BY courseid";
 $contentitems = $DB->get_records_sql($sql, $inparams);
 
+// TODO: Only modules available to the current user are valid, so check course access here too.
 foreach ($contentitems as $contentitem) {
     foreach ($context['courses'] as $index => $course) {
         if ($course->id == $contentitem->courseid) {
@@ -132,7 +133,9 @@ foreach ($contentitems as $contentitem) {
                 if ($mod->context->id == $contentitem->contextid) {
                     $context['courses'][$index]->modules[] = [
                         'name' => $mod->name,
-                        'id' => $contentitem->enrol_lti_id
+                        'id' => $contentitem->enrol_lti_id,
+                        // TODO: Probably need to also exclude activities which have incompatible grading methods.
+                        'lineitem' => plugin_supports('mod', $mod->modname, FEATURE_GRADE_HAS_GRADE)
                     ];
                 }
             }

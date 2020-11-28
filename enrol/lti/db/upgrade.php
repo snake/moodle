@@ -113,5 +113,21 @@ function xmldb_enrol_lti_upgrade($oldversion) {
         upgrade_plugin_savepoint(true, 2021052503, 'enrol', 'lti');
     }
 
+    if ($oldversion < 2021052504) {
+        // Add a new column 'platformid' to the enrol_lti_users table.
+        $table = new xmldb_table('enrol_lti_users');
+
+        // Define field platformid to be added to enrol_lti_users.
+        $field = new xmldb_field('platformid', XMLDB_TYPE_CHAR, 255, null, null, null, null, 'sourceid');
+
+        // Conditionally launch add field platformid.
+        if (!$dbman->field_exists($table, $field)) {
+            $dbman->add_field($table, $field);
+        }
+
+        // Lti savepoint reached.
+        upgrade_plugin_savepoint(true, 2021052504, 'enrol', 'lti');
+    }
+
     return true;
 }
