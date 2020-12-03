@@ -82,6 +82,8 @@ class LTI_Deep_Link_Resource {
             $resource["lineItem"] = [
                 "scoreMaximum" => $this->lineitem->get_score_maximum(),
                 "label" => $this->lineitem->get_label(),
+                "resourceId" => $this->lineitem->get_resource_id(),
+                "tag" => $this->lineitem->get_tag()
             ];
         }
         return $resource;
