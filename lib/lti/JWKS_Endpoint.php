@@ -1,7 +1,6 @@
 <?php
 namespace IMSGlobal\LTI13;
 
-use phpseclib3\Crypt\RSA;
 use \Firebase\JWT\JWT;
 
 class JWKS_Endpoint {
@@ -28,19 +27,15 @@ class JWKS_Endpoint {
     public function get_public_jwks() {
         $jwks = [];
         foreach ($this->keys as $kid => $private_key) {
-            $key = new RSA();
-            $key->setHash("sha256");
-            $key->loadKey($private_key);
-            $key->setPublicKey(false, RSA::PUBLIC_FORMAT_PKCS8);
-            if ( !$key->publicExponent ) {
-                continue;
-            }
+            $key_res = openssl_pkey_get_private($private_key);
+            $key_details = openssl_pkey_get_details($key_res);
+
             $components = array(
                 'kty' => 'RSA',
                 'alg' => 'RS256',
                 'use' => 'sig',
-                'e' => JWT::urlsafeB64Encode($key->publicExponent->toBytes()),
-                'n' => JWT::urlsafeB64Encode($key->modulus->toBytes()),
+                'e' => JWT::urlsafeB64Encode($key_details['rsa']['e']),
+                'n' => JWT::urlsafeB64Encode($key_details['rsa']['n']),
                 'kid' => $kid,
             );
             $jwks[] = $components;
