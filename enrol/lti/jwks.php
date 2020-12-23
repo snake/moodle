@@ -22,27 +22,16 @@
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
+use IMSGlobal\LTI13\JWKS_Endpoint;
+
 define('NO_DEBUG_DISPLAY', true);
 define('NO_MOODLE_COOKIES', true);
 
 require_once(__DIR__ . '/../../config.php');
 
-$jwks = ['keys' => []];
-
 $privatekey = get_config('enrol_lti', 'lti_13_privatekey');
-$res = openssl_pkey_get_private($privatekey);
-$details = openssl_pkey_get_details($res);
-
-$jwk = [];
-$jwk['kty'] = 'RSA';
-$jwk['alg'] = 'RS256';
-$jwk['kid'] = get_config('enrol_lti', 'lti_13_kid');
-$jwk['e'] = rtrim(strtr(base64_encode($details['rsa']['e']), '+/', '-_'), '=');
-$jwk['n'] = rtrim(strtr(base64_encode($details['rsa']['n']), '+/', '-_'), '=');
-$jwk['use'] = 'sig';
-
-$jwks['keys'][] = $jwk;
+$key = get_config('enrol_lti', 'lti_13_kid');
+$keyendpoint = JWKS_Endpoint::new([$key => $privatekey]);
 
 @header('Content-Type: application/json; charset=utf-8');
-
-echo json_encode($jwks, JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT);
+$keyendpoint->output_jwks();
