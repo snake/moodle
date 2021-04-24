@@ -25,11 +25,13 @@ namespace enrol_lti\local\ltiadvantage\service;
 use enrol_lti\helper;
 use enrol_lti\local\ltiadvantage\entity\context;
 use enrol_lti\local\ltiadvantage\entity\deployment;
+use enrol_lti\local\ltiadvantage\entity\migration_claim;
 use enrol_lti\local\ltiadvantage\entity\resource_link;
 use enrol_lti\local\ltiadvantage\entity\user;
 use enrol_lti\local\ltiadvantage\repository\application_registration_repository;
 use enrol_lti\local\ltiadvantage\repository\context_repository;
 use enrol_lti\local\ltiadvantage\repository\deployment_repository;
+use enrol_lti\local\ltiadvantage\repository\legacy_consumer_repository;
 use enrol_lti\local\ltiadvantage\repository\resource_link_repository;
 use enrol_lti\local\ltiadvantage\repository\user_repository;
 use IMSGlobal\LTI13\LTI_Message_Launch;
@@ -91,6 +93,8 @@ class tool_launch_service {
         $data = [
             'platform' => $launchdata['iss'],
             'clientid' => $launchdata['aud'], // See LTI_Message_Launch::validate_registration for details about aud.
+            'exp' => $launchdata['exp'],
+            'nonce' => $launchdata['nonce'],
             'sub' => $launchdata['sub'],
             'roles' => $launchdata['https://purl.imsglobal.org/spec/lti/claim/roles'],
             'deploymentid' => $launchdata['https://purl.imsglobal.org/spec/lti/claim/deployment_id'],
@@ -107,7 +111,8 @@ class tool_launch_service {
                 'image' => $launchdata['image'] ?? null,
             ],
             'ags' => $launchdata['https://purl.imsglobal.org/spec/lti-ags/claim/endpoint'] ?? null,
-            'nrps' => $launchdata['https://purl.imsglobal.org/spec/lti-nrps/claim/namesroleservice'] ?? null
+            'nrps' => $launchdata['https://purl.imsglobal.org/spec/lti-nrps/claim/namesroleservice'] ?? null,
+            'lti1p1' => $launchdata['https://purl.imsglobal.org/spec/lti/claim/lti1p1'] ?? null
         ];
 
         return (object) $data;
@@ -191,24 +196,16 @@ class tool_launch_service {
     private function user_from_launchdata(\stdClass $launchdata, \stdClass $resource,
             resource_link $resourcelink): user {
 
-        $deploymentidentifiers = [
-            $launchdata->platform,
-            $launchdata->clientid,
-            $launchdata->deploymentid,
-            $launchdata->sub
-        ];
-        $identifierstr = implode('_', $deploymentidentifiers);
-        $username = 'enrol_lti_' . sha1($identifierstr);
-
-        if ($founduser = $this->userrepo->find_by_username($username, $resource->id)) {
+        // Find the user based on the unique-to-the-issuer 'sub' value.
+        if ($founduser = $this->userrepo->find_by_sub($launchdata->sub, $launchdata->platform, $resource->id)) {
             // User exists, so update existing.
             $user = user::create(
                 $resource->id,
+                $founduser->get_issuer(),
                 $founduser->get_deploymentid(),
                 $launchdata->sub,
                 $launchdata->user['givenname'] ?? $launchdata->sub,
                 $launchdata->user['familyname'] ?? $resource->contextid,
-                $username,
                 $resource->lang,
                 $launchdata->user['email'] ?? '',
                 $resource->city ?? '',
@@ -223,22 +220,38 @@ class tool_launch_service {
             );
             $user->set_resourcelinkid($resourcelink->get_id());
         } else {
+            // Create the lti user.
             $user = $resourcelink->add_user(
+                $launchdata->platform,
                 $launchdata->sub,
                 $launchdata->user['givenname'] ?? $launchdata->sub,
                 $launchdata->user['familyname'] ?? $resource->contextid,
-                $username,
                 $resource->lang,
                 $launchdata->user['email'] ?? '',
                 $resource->city ?? '',
                 $resource->country ?? '',
                 $resource->institution ?? '',
                 $resource->timezone ?? '',
-                $resource->maildisplay ?? null
+                $resource->maildisplay ?? null,
             );
         }
         $user->set_lastaccess(time());
         return $user;
+    }
+
+    /**
+     * Get the migration claim from the launch data, or null if not found.
+     *
+     * @param \stdClass $launchdata the launch data.
+     * @return migration_claim|null the claim instance if present in the launch data, else null.
+     */
+    private function migration_claim_from_launchdata(\stdClass $launchdata): ?migration_claim {
+        if (!isset($launchdata->lti1p1)) {
+            return null;
+        }
+        return new migration_claim($launchdata->lti1p1, $launchdata->deploymentid,
+            $launchdata->platform, $launchdata->clientid, $launchdata->exp, $launchdata->nonce,
+            new legacy_consumer_repository());
     }
 
     /**
@@ -324,10 +337,16 @@ class tool_launch_service {
                 "(issuer: {$launchdata->platform}, 'clientid: {$launchdata->clientid}).");
         }
 
+        $migrationclaim = $this->migration_claim_from_launchdata($launchdata);
+
         if (!$deployment = $this->deploymentrepo->find_by_registration($registration->get_id(),
             $launchdata->deploymentid)) {
             throw new \coding_exception("Invalid launch. Cannot launch tool for invalid deployment id " .
                 "'{$launchdata->deploymentid}'.");
+        }
+        if ($migrationclaim) {
+            $deployment->set_legacy_consumer_key($migrationclaim->get_consumer_key());
+            $this->deploymentrepo->save($deployment);
         }
 
         // Save the context, if that claim is present.
@@ -343,6 +362,21 @@ class tool_launch_service {
 
         // Save the user launching the resource link.
         $user = $this->user_from_launchdata($launchdata, $resource, $resourcelink);
+
+        // Only migrate users who are eligible: those who don't exist yet.
+        if ($migrationclaim && !$user->get_id()) {
+            $legacyuserid = $migrationclaim->get_user_id() ?? $user->get_sourceid();
+            $legacyconsumerkey = $migrationclaim->get_consumer_key();
+
+            // Now link the user with their legacy user account information.
+            // TODO: Move the id fetching to a legacy user repository method and test it.
+            $legacyusername = helper::create_username($legacyconsumerkey, $legacyuserid);
+            global $DB;
+            $legacyuserid = $DB->get_field('user', 'id', ['username' => $legacyusername]);
+            if ($legacyuserid !== false) {
+                $user->set_localid($legacyuserid);
+            }
+        }
         $user = $this->userrepo->save($user);
 
         if (!empty($launchdata->user['image'])) {
@@ -364,7 +398,7 @@ class tool_launch_service {
         // Enrol the user in the course with no role.
         $result = helper::enrol_user($resource, $user->get_localid());
         if ($result !== helper::ENROLMENT_SUCCESSFUL) {
-            print_error($result, 'enrol_lti');
+            throw new \moodle_exception($result, 'enrol_lti');
         }
 
         // Give the user the role in the given context.
