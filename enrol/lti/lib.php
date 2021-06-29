@@ -169,6 +169,7 @@ class enrol_lti_plugin extends enrol_plugin {
         $tool = $DB->get_record('enrol_lti_tools', array('enrolid' => $instance->id), 'id', MUST_EXIST);
 
         // LTI Advantage: delete any resource_link and user_resource_link mappings.
+        // TODO: Unit test this.
         $resourcelinkrepo = new resource_link_repository();
         $resourcelinkrepo->delete_by_resource($tool->id);
 
