@@ -107,8 +107,26 @@ class admin_setting_toolendpoints extends \admin_setting {
     public function output_html($data, $query='') {
         global $PAGE, $CFG;
 
-        $urls = [
-            'urls' => [
+        // TODO Generate the registration URL if:
+        //  a) token is still valid (time)
+        //  b) token is still valid (not used up)
+        global $DB;
+        $regtokenrec = $DB->get_record_select('enrol_lti_reg_token', 'expirytime > :timenow', ['timenow' => time()]);
+        $regurl = $regtokenrec ? $CFG->wwwroot . '/enrol/lti/register.php?token='.$regtokenrec->token : null;
+        $expiryinfo = $regtokenrec ? "(Expires ".date('H:i, M dS, Y', $regtokenrec->expirytime).
+            " or on first use.)" : null;
+
+        $endpoints = [
+            'dynamic_registration_info' => "For platforms supporting LTI Advantage Dynamic Registration, you can generate a one-time registration URL
+            here. More information on dynamic registration can be found on the <docs link here>",
+            'dynamic_registration_url' => [
+                'name' => 'Registration URL', // TODO Lang strings
+                'url' => $regurl,
+                'expiryinfo' => $expiryinfo,
+                'id' => uniqid()
+            ],
+            'manual_registration_info' => get_string('endpointltiversionnotice', 'enrol_lti'),
+            'manual_registration_urls' => [
                 [
                     'name' => get_string('toolurl', 'enrol_lti'),
                     'url' => $CFG->wwwroot . '/enrol/lti/launch.php',
@@ -133,7 +151,7 @@ class admin_setting_toolendpoints extends \admin_setting {
         ];
 
         $renderer = $PAGE->get_renderer('enrol_lti');
-        $return = $renderer->render_admin_setting_tool_endpoints($urls);
+        $return = $renderer->render_admin_setting_tool_endpoints($endpoints);
         return highlight($query, $return);
     }
 }

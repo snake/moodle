@@ -134,4 +134,45 @@ class application_registration_service {
 
         $this->appregistrationrepo->delete($registrationid);
     }
+
+    /**
+     * Get a one-time-use dynamic registration URL which is valid only for the specified duration.
+     *
+     * @param int $durationsecs how long, in seconds, the registration URL will be valid for.
+     */
+    public function create_registration_url(int $durationsecs = 86400): \moodle_url {
+        global $CFG;
+        $addr = $CFG->wwwroot . '/enrol/lti/register.php';
+        $bytes = random_bytes(30);
+        $token = bin2hex($bytes);
+
+        // Save the registration init token and put an expiry on it.
+        global $DB;
+        $created = time();
+        $expirytime = $created + $durationsecs;
+        $DB->delete_records('enrol_lti_reg_token');
+        $DB->insert_record('enrol_lti_reg_token',
+            ['token' => $token, 'expirytime' => $expirytime, 'timecreated' => $created]);
+
+        return new \moodle_url($addr, ['token' => $token]);
+        //$regurl = new registration_url($addr, $token, $durationsecs);
+        //$savedurl = $regurlrepo->save($regurl);
+    }
+
+    public function get_registration_url(): ?\moodle_url {
+        global $DB;
+
+        $timenow = time();
+        if ($tokenrecs = $DB->get_records_select('enrol_lti_reg_token', "expirytime > $timenow")) {
+            global $CFG;
+            $tokenrec = array_shift($tokenrecs);
+            $regurl = new \moodle_url($CFG->wwwroot . '/enrol/lti/register.php', ['token' => $tokenrec->token]);
+        }
+        return $regurl ?? null;
+    }
+
+    public function delete_registration_url(): void {
+        global $DB;
+        $DB->delete_records('enrol_lti_reg_token');
+    }
 }
