@@ -26,6 +26,7 @@
         "gradepenalty": "grade\/penalty",
         "gradereport": "grade\/report",
         "gradingform": "grade\/grading\/form",
+        "ltixservice": "ltix\/service",
         "mlbackend": "lib\/mlbackend",
         "webservice": "webservice",
         "repository": "repository",
