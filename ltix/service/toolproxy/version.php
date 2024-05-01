@@ -15,13 +15,20 @@
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
- * Strings for component 'ltiservice_toolproxy', language 'en'
+ * Version information for the ltixservice_toolproxy service.
  *
- * @package    ltiservice_toolproxy
+ * @package    ltixservice_toolproxy
  * @copyright  2014 Vital Source Technologies http://vitalsource.com
  * @author     Stephen Vickers
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
-$string['pluginname'] = 'Tool Proxy Service';
-$string['privacy:metadata'] = 'The Tool Proxy Service plugin does not store any personal data.';
+
+defined('MOODLE_INTERNAL') || die();
+
+$plugin->version   = 2024100700;
+$plugin->requires  = 2024100100;
+$plugin->component = 'ltixservice_toolproxy';
+$plugin->dependencies = [
+    'ltixservice_profile' => 2024100100,
+];
