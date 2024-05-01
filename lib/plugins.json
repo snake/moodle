@@ -242,7 +242,8 @@
             "database",
             "standard"
         ],
-        "ltiservice": [
+        "ltiservice": [],
+        "ltixservice": [
             "basicoutcomes",
             "gradebookservices",
             "memberships",
