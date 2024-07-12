@@ -1,6 +1,8 @@
 {
     "plugintypes": {
-        "ltisource": "mod\/lti\/source",
+        "ltisource": "mod\/lti\/source"
+    },
+    "deprecatedplugintypes": {
         "ltiservice": "mod\/lti\/service"
     }
 }
