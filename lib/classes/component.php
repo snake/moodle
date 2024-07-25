@@ -83,6 +83,18 @@ class component {
     protected static $parents = null;
     /** @var array subplugins */
     protected static $subplugins = null;
+    /** @var array deprecated plugins  */
+    protected static $deprecatedplugins = null;
+    /** @var array deleted plugins */
+    protected static $deletedplugins = null;
+    /** @var array deprecated plugin types */
+    protected static $deprecatedplugintypes = null;
+    /** @var array deleted plugin types */
+    protected static $deletedplugintypes = null;
+    /** @var array deprecated sub plugins */
+    protected static $deprecatedsubplugins = null;
+    /** @var array deleted sub plugins */
+    protected static $deletedsubplugins = null;
     /** @var array cache of core APIs */
     protected static $apis = null;
     /** @var array list of all known classes that can be autoloaded */
@@ -314,15 +326,21 @@ class component {
                 }
                 $cache = [];
                 include($cachefile);
-                self::$plugintypes      = $cache['plugintypes'];
-                self::$plugins          = $cache['plugins'];
-                self::$subsystems       = $cache['subsystems'];
-                self::$parents          = $cache['parents'];
-                self::$subplugins       = $cache['subplugins'];
-                self::$apis             = $cache['apis'];
-                self::$classmap         = $cache['classmap'];
-                self::$classmaprenames  = $cache['classmaprenames'];
-                self::$filemap          = $cache['filemap'];
+                self::$plugintypes              = $cache['plugintypes'];
+                self::$deprecatedplugintypes    = $cache['deprecatedplugintypes'];
+                self::$deletedplugintypes       = $cache['deletedplugintypes'];
+                self::$plugins                  = $cache['plugins'];
+                self::$deprecatedplugins        = $cache['deprecatedplugins'];
+                self::$deletedplugins           = $cache['deletedplugins'];
+                self::$subsystems               = $cache['subsystems'];
+                self::$parents                  = $cache['parents'];
+                self::$subplugins               = $cache['subplugins'];
+                self::$deprecatedsubplugins     = $cache['deprecatedsubplugins'];
+                self::$deletedsubplugins        = $cache['deletedsubplugins'];
+                self::$apis                     = $cache['apis'];
+                self::$classmap                 = $cache['classmap'];
+                self::$classmaprenames          = $cache['classmaprenames'];
+                self::$filemap                  = $cache['filemap'];
                 return;
             }
 
@@ -348,15 +366,21 @@ class component {
                 include($cachefile);
                 if (is_array($cache) && self::is_cache_valid($cache)) {
                     // The cache looks ok, let's use it.
-                    self::$plugintypes      = $cache['plugintypes'];
-                    self::$plugins          = $cache['plugins'];
-                    self::$subsystems       = $cache['subsystems'];
-                    self::$parents          = $cache['parents'];
-                    self::$subplugins       = $cache['subplugins'];
-                    self::$apis             = $cache['apis'];
-                    self::$classmap         = $cache['classmap'];
-                    self::$classmaprenames  = $cache['classmaprenames'];
-                    self::$filemap          = $cache['filemap'];
+                    self::$plugintypes              = $cache['plugintypes'];
+                    self::$deprecatedplugintypes    = $cache['deprecatedplugintypes'];
+                    self::$deletedplugintypes       = $cache['deletedplugintypes'];
+                    self::$plugins                  = $cache['plugins'];
+                    self::$deprecatedplugins        = $cache['deprecatedplugins'];
+                    self::$deletedplugins           = $cache['deletedplugins'];
+                    self::$subsystems               = $cache['subsystems'];
+                    self::$parents                  = $cache['parents'];
+                    self::$subplugins               = $cache['subplugins'];
+                    self::$deprecatedsubplugins     = $cache['deprecatedsubplugins'];
+                    self::$deletedsubplugins        = $cache['deletedsubplugins'];
+                    self::$apis                     = $cache['apis'];
+                    self::$classmap                 = $cache['classmap'];
+                    self::$classmaprenames          = $cache['classmaprenames'];
+                    self::$filemap                  = $cache['filemap'];
                     return;
                 }
                 // Note: we do not verify $CFG->admin here intentionally,
@@ -496,16 +520,22 @@ class component {
         }
 
         $cache = [
-            'subsystems'        => self::$subsystems,
-            'plugintypes'       => self::$plugintypes,
-            'plugins'           => self::$plugins,
-            'parents'           => self::$parents,
-            'subplugins'        => self::$subplugins,
-            'apis'              => self::$apis,
-            'classmap'          => self::$classmap,
-            'classmaprenames'   => self::$classmaprenames,
-            'filemap'           => self::$filemap,
-            'version'           => self::$version,
+            'subsystems'            => self::$subsystems,
+            'plugintypes'           => self::$plugintypes,
+            'deprecatedplugintypes' => self::$deprecatedplugintypes,
+            'deletedplugintypes'    => self::$deletedplugintypes,
+            'plugins'               => self::$plugins,
+            'deprecatedplugins'     => self::$deprecatedplugins,
+            'deletedplugins'        => self::$deletedplugins,
+            'subplugins'            => self::$subplugins,
+            'deprecatedsubplugins'  => self::$deprecatedsubplugins,
+            'deletedsubplugins'     => self::$deletedsubplugins,
+            'parents'               => self::$parents,
+            'apis'                  => self::$apis,
+            'classmap'              => self::$classmap,
+            'classmaprenames'       => self::$classmaprenames,
+            'filemap'               => self::$filemap,
+            'version'               => self::$version,
         ];
 
         return '<?php
@@ -519,11 +549,29 @@ $cache = ' . var_export($cache, true) . ';
     protected static function fill_all_caches() {
         self::$subsystems = self::fetch_subsystems();
 
-        [self::$plugintypes, self::$parents, self::$subplugins] = self::fetch_plugintypes();
+        [
+            self::$plugintypes,
+            self::$parents,
+            self::$subplugins,
+            self::$deprecatedplugintypes,
+            self::$deletedplugintypes,
+            self::$deprecatedsubplugins,
+            self::$deletedsubplugins
+        ] = self::fetch_plugintypes();
 
         self::$plugins = [];
         foreach (self::$plugintypes as $type => $fulldir) {
             self::$plugins[$type] = self::fetch_plugins($type, $fulldir);
+        }
+
+        self::$deprecatedplugins = [];
+        foreach (self::$deprecatedplugintypes as $type => $fulldir) {
+            self::$deprecatedplugins[$type] = self::fetch_plugins($type, $fulldir);
+        }
+
+        self::$deletedplugins = [];
+        foreach (self::$deletedplugintypes as $type => $fulldir) {
+            self::$deletedplugins[$type] = self::fetch_plugins($type, $fulldir);
         }
 
         self::$apis = self::fetch_apis();
@@ -601,8 +649,49 @@ $cache = ' . var_export($cache, true) . ';
             $types[$plugintype] = "{$CFG->dirroot}/{$path}";
         }
 
+        $deprecatedtypes = [];
+        foreach (self::fetch_component_source('deprecatedplugintypes') as $plugintype => $path) {
+            // Replace admin/ with the config setting.
+            if ($CFG->admin !== 'admin' && strpos($path, 'admin/') === 0) {
+                $path = $CFG->admin . substr($path, 5);
+            }
+            $deprecatedtypes[$plugintype] = "{$CFG->dirroot}/{$path}";
+        }
+
+        $deletedtypes = [];
+        foreach (self::fetch_component_source('deletedplugintypes') as $plugintype => $path) {
+            // Replace admin/ with the config setting.
+            if ($CFG->admin !== 'admin' && strpos($path, 'admin/') === 0) {
+                $path = $CFG->admin . substr($path, 5);
+            }
+            $deletedtypes[$plugintype] = "{$CFG->dirroot}/{$path}";
+        }
+
+        // Prevent deprecation of plugin types supporting subplugins (those in self::$supportsubplugins).
+        $illegaldeprecatedtypes = array_intersect(self::$supportsubplugins, array_keys($deprecatedtypes));
+        if (!empty($illegaldeprecatedtypes)) {
+            debugging("Deprecation of a plugin type which supports subplugins is not supported. These plugin types will continue ".
+                "to be treated as active.", DEBUG_DEVELOPER);
+            foreach ($illegaldeprecatedtypes as $plugintype) {
+                $types[$plugintype] = $deprecatedtypes[$plugintype];
+                unset($deprecatedtypes[$plugintype]);
+            }
+        }
+        // Prevent deletion of plugin types supporting subplugins (those in self::$supportsubplugins).
+        $illegaldeletedtypes = array_intersect(self::$supportsubplugins, array_keys($deletedtypes));
+        if (!empty($illegaldeletedtypes)) {
+            debugging("Deletion of a plugin type which supports subplugins is not supported. These plugin types will continue ".
+                "to be treated as active.", DEBUG_DEVELOPER);
+            foreach ($illegaldeletedtypes as $plugintype) {
+                $types[$plugintype] = $deletedtypes[$plugintype];
+                unset($deletedtypes[$plugintype]);
+            }
+        }
+
         $parents = [];
         $subplugins = [];
+        $deprecatedsubplugins = [];
+        $deletedsubplugins = [];
 
         if (!empty($CFG->themedir) && is_dir($CFG->themedir)) {
             $types['theme'] = $CFG->themedir;
@@ -615,21 +704,49 @@ $cache = ' . var_export($cache, true) . ';
                 // Local subplugins must be after local plugins.
                 continue;
             }
+
             $plugins = self::fetch_plugins($type, $types[$type]);
             foreach ($plugins as $plugin => $fulldir) {
-                $subtypes = self::fetch_subtypes($fulldir);
-                if (!$subtypes) {
+                $allsubtypes =  self::fetch_subtypes($fulldir);
+                $subtypes = $allsubtypes['plugintypes'] ?? null;
+                $deprecatedsubtypes = $allsubtypes['deprecatedplugintypes'] ?? null;
+                $deletedsubtypes = $allsubtypes['deletedplugintypes'] ?? null;
+                if (!$subtypes && !$deprecatedsubtypes && !$deletedsubtypes) {
                     continue;
                 }
                 $subplugins[$type . '_' . $plugin] = [];
-                foreach ($subtypes as $subtype => $subdir) {
-                    if (isset($types[$subtype])) {
-                        error_log("Invalid subtype '$subtype', duplicate detected.");
-                        continue;
+                if ($subtypes) {
+                    foreach ($subtypes as $subtype => $subdir) {
+                        if (isset($types[$subtype]) || isset($deprecatedtypes[$subtype]) || isset($deletedtypes[$subtype])) {
+                            error_log("Invalid subtype '$subtype', duplicate detected.");
+                            continue;
+                        }
+                        $types[$subtype] = $subdir;
+                        $parents[$subtype] = $type . '_' . $plugin;
+                        $subplugins[$type . '_' . $plugin][$subtype] = array_keys(self::fetch_plugins($subtype, $subdir));
                     }
-                    $types[$subtype] = $subdir;
-                    $parents[$subtype] = $type . '_' . $plugin;
-                    $subplugins[$type . '_' . $plugin][$subtype] = array_keys(self::fetch_plugins($subtype, $subdir));
+                }
+                if ($deprecatedsubtypes) {
+                    foreach ($deprecatedsubtypes as $subtype => $subdir) {
+                        if (isset($types[$subtype]) || isset($deprecatedtypes[$subtype]) || isset($deletedtypes[$subtype])) {
+                            error_log("Invalid subtype '$subtype', duplicate detected.");
+                            continue;
+                        }
+                        $deprecatedtypes[$subtype] = $subdir;
+                        $parents[$subtype] = $type . '_' . $plugin;
+                        $deprecatedsubplugins[$type . '_' . $plugin][$subtype] = array_keys(self::fetch_plugins($subtype, $subdir));
+                    }
+                }
+                if ($deletedsubtypes) {
+                    foreach ($deletedsubtypes as $subtype => $subdir) {
+                        if (isset($types[$subtype]) || isset($deprecatedtypes[$subtype]) || isset($deletedtypes[$subtype])) {
+                            error_log("Invalid subtype '$subtype', duplicate detected.");
+                            continue;
+                        }
+                        $deletedtypes[$subtype] = $subdir;
+                        $parents[$subtype] = $type . '_' . $plugin;
+                        $deletedsubplugins[$type . '_' . $plugin][$subtype] = array_keys(self::fetch_plugins($subtype, $subdir));
+                    }
                 }
             }
         }
@@ -640,24 +757,53 @@ $cache = ' . var_export($cache, true) . ';
             $type = 'local';
             $plugins = self::fetch_plugins($type, $types[$type]);
             foreach ($plugins as $plugin => $fulldir) {
-                $subtypes = self::fetch_subtypes($fulldir);
-                if (!$subtypes) {
+                $allsubtypes =  self::fetch_subtypes($fulldir);
+                $subtypes = $allsubtypes['plugintypes'];
+                $deprecatedsubtypes = $allsubtypes['deprecatedplugintypes'];
+                $deletedsubtypes = $allsubtypes['deletedplugintypes'];
+                if (!$subtypes && !$deprecatedsubtypes && !$deletedsubtypes) {
                     continue;
                 }
                 $subplugins[$type . '_' . $plugin] = [];
-                foreach ($subtypes as $subtype => $subdir) {
-                    if (isset($types[$subtype])) {
-                        error_log("Invalid subtype '$subtype', duplicate detected.");
-                        continue;
+                $deprecatedsubplugins[$type . '_' . $plugin] = [];
+                $deletedsubplugins[$type . '_' . $plugin] = [];
+
+                if ($subtypes) {
+                    foreach ($subtypes as $subtype => $subdir) {
+                        if (isset($types[$subtype]) || isset($deprecatedtypes[$subtype]) || isset($deletedtypes[$subtype])) {
+                            error_log("Invalid subtype '$subtype', duplicate detected.");
+                            continue;
+                        }
+                        $types[$subtype] = $subdir;
+                        $parents[$subtype] = $type . '_' . $plugin;
+                        $subplugins[$type . '_' . $plugin][$subtype] = array_keys(self::fetch_plugins($subtype, $subdir));
                     }
-                    $types[$subtype] = $subdir;
-                    $parents[$subtype] = $type . '_' . $plugin;
-                    $subplugins[$type . '_' . $plugin][$subtype] = array_keys(self::fetch_plugins($subtype, $subdir));
+                }
+                if ($deprecatedsubtypes) {
+                    foreach ($deprecatedsubtypes as $subtype => $subdir) {
+                        if (isset($types[$subtype]) || isset($deprecatedtypes[$subtype]) || isset($deletedtypes[$subtype])) {
+                            error_log("Invalid subtype '$subtype', duplicate detected.");
+                            continue;
+                        }
+                        $deprecatedtypes[$subtype] = $subdir;
+                        $parents[$subtype] = $type . '_' . $plugin;
+                        $deprecatedsubplugins[$type . '_' . $plugin][$subtype] = array_keys(self::fetch_plugins($subtype, $subdir));
+                    }
+                }
+                if ($deletedsubtypes) {
+                    foreach ($deletedsubtypes as $subtype => $subdir) {
+                        if (isset($types[$subtype]) || isset($deprecatedtypes[$subtype]) || isset($deletedtypes[$subtype])) {
+                            error_log("Invalid subtype '$subtype', duplicate detected.");
+                            continue;
+                        }
+                        $deletedtypes[$subtype] = $subdir;
+                        $deletedsubplugins[$type . '_' . $plugin][$subtype] = array_keys(self::fetch_plugins($subtype, $subdir));
+                    }
                 }
             }
         }
 
-        return [$types, $parents, $subplugins];
+        return [$types, $parents, $subplugins, $deprecatedtypes, $deletedtypes, $deprecatedsubplugins, $deletedsubplugins];
     }
 
     /**
@@ -670,7 +816,7 @@ $cache = ' . var_export($cache, true) . ';
             self::$componentsource = (array) json_decode(file_get_contents(__DIR__ . '/../components.json'));
         }
 
-        return (array) self::$componentsource[$key];
+        return !empty(self::$componentsource[$key]) ? (array) self::$componentsource[$key] : [];
     }
 
     /**
@@ -683,14 +829,28 @@ $cache = ' . var_export($cache, true) . ';
 
         $types = [];
         $subplugins = [];
+        $deprecatedsubplugins = [];
+        $deletedsubplugins = [];
         if (file_exists("$ownerdir/db/subplugins.json")) {
-            $subplugins = [];
             $subpluginsjson = json_decode(file_get_contents("$ownerdir/db/subplugins.json"));
             if (json_last_error() === JSON_ERROR_NONE) {
+                if (empty($subpluginsjson->plugintypes) &&
+                        empty($subpluginsjson->deprecatedplugintypes) &&
+                        empty($subpluginsjson->deletedplugintypes)) {
+
+                    error_log("No plugintypes defined in $ownerdir/db/subplugins.json");
+                }
+                // Available subplugin types.
                 if (!empty($subpluginsjson->plugintypes)) {
                     $subplugins = (array) $subpluginsjson->plugintypes;
-                } else {
-                    error_log("No plugintypes defined in $ownerdir/db/subplugins.json");
+                }
+                // Deprecated subplugin types.
+                if (!empty($subpluginsjson->deprecatedplugintypes)) {
+                    $deprecatedsubplugins = (array) $subpluginsjson->deprecatedplugintypes;
+                }
+                // Deleted subplugin types.
+                if (!empty($subpluginsjson->deletedplugintypes)) {
+                    $deletedsubplugins = (array) $subpluginsjson->deletedplugintypes;
                 }
             } else {
                 $jsonerror = json_last_error_msg();
@@ -702,6 +862,7 @@ $cache = ' . var_export($cache, true) . ';
             include("$ownerdir/db/subplugins.php");
         }
 
+        // Available subplugins.
         foreach ($subplugins as $subtype => $dir) {
             if (!preg_match('/^[a-z][a-z0-9]*$/', $subtype)) {
                 error_log("Invalid subtype '$subtype'' detected in '$ownerdir', invalid characters present.");
@@ -718,7 +879,47 @@ $cache = ' . var_export($cache, true) . ';
                 error_log("Invalid subtype directory '$dir' detected in '$ownerdir'.");
                 continue;
             }
-            $types[$subtype] = "$CFG->dirroot/$dir";
+            $types['plugintypes'][$subtype] = "$CFG->dirroot/$dir";
+        }
+
+        // Deprecated subplugins.
+        foreach ($deprecatedsubplugins as $subtype => $dir) {
+            if (!preg_match('/^[a-z][a-z0-9]*$/', $subtype)) {
+                error_log("Invalid subtype '$subtype'' detected in '$ownerdir', invalid characters present.");
+                continue;
+            }
+            if (isset(self::$subsystems[$subtype])) {
+                error_log("Invalid subtype '$subtype'' detected in '$ownerdir', duplicates core subsystem.");
+                continue;
+            }
+            if ($CFG->admin !== 'admin' && strpos($dir, 'admin/') === 0) {
+                $dir = preg_replace('|^admin/|', "$CFG->admin/", $dir);
+            }
+            if (!is_dir("$CFG->dirroot/$dir")) {
+                error_log("Invalid subtype directory '$dir' detected in '$ownerdir'.");
+                continue;
+            }
+            $types['deprecatedplugintypes'][$subtype] = "$CFG->dirroot/$dir";
+        }
+
+        // Deleted subplugins.
+        foreach ($deletedsubplugins as $subtype => $dir) {
+            if (!preg_match('/^[a-z][a-z0-9]*$/', $subtype)) {
+                error_log("Invalid subtype '$subtype'' detected in '$ownerdir', invalid characters present.");
+                continue;
+            }
+            if (isset(self::$subsystems[$subtype])) {
+                error_log("Invalid subtype '$subtype'' detected in '$ownerdir', duplicates core subsystem.");
+                continue;
+            }
+            if ($CFG->admin !== 'admin' && strpos($dir, 'admin/') === 0) {
+                $dir = preg_replace('|^admin/|', "$CFG->admin/", $dir);
+            }
+            if (!is_dir("$CFG->dirroot/$dir")) {
+                error_log("Invalid subtype directory '$dir' detected in '$ownerdir'.");
+                continue;
+            }
+            $types['deletedplugintypes'][$subtype] = "$CFG->dirroot/$dir";
         }
 
         return $types;
@@ -796,6 +997,14 @@ $cache = ' . var_export($cache, true) . ';
                 self::load_legacy_classes($fulldir);
             }
         }
+
+        // Include deprecated plugins in the classmap, to facilitate migration code which uses existing plugin classes.
+        foreach (self::$deprecatedplugins as $plugintype => $plugins) {
+            foreach ($plugins as $pluginname => $fulldir) {
+                self::load_classes($plugintype . '_' . $pluginname, "$fulldir/classes");
+            }
+        }
+
         ksort(self::$classmap);
     }
 
@@ -921,6 +1130,72 @@ $cache = ' . var_export($cache, true) . ';
     }
 
     /**
+     * Get a list of deprecated plugin types and their locations.
+     *
+     * @return array as (string)plugintype => (string)fulldir
+     */
+    public static function get_deprecated_plugin_types(): array {
+        self::init();
+        return self::$deprecatedplugintypes;
+    }
+
+    /**
+     * Get a list of all deleted plugin types and their locations.
+     *
+     * @return array as (string)plugintype => (string)fulldir
+     */
+    public static function get_deleted_plugin_types(): array {
+        self::init();
+        return self::$deletedplugintypes;
+    }
+
+    /**
+     * Is the plugintype deprecated.
+     *
+     * @param string $plugintype
+     * @return bool true if deprecated, false otherwise.
+     */
+    public static function is_deprecated_plugin_type(string $plugintype): bool {
+        self::init();
+        return array_key_exists($plugintype, self::$deprecatedplugintypes);
+    }
+
+    /**
+     * Is the plugintype deleted.
+     *
+     * @param string $plugintype
+     * @return bool true if deleted, false otherwise.
+     */
+    public static function is_deleted_plugin_type(string $plugintype): bool {
+        self::init();
+        return array_key_exists($plugintype, self::$deletedplugintypes);
+    }
+
+    /**
+     * Is the plugin of a deprecated plugin type.
+     *
+     * @param string $pluginname
+     * @return bool true if deprecated, false otherwise.
+     */
+    public static function is_deprecated_plugin(string $pluginname): bool {
+        self::init();
+        [$type, $name] = self::normalize_component($pluginname);
+        return array_key_exists($name, self::$deprecatedplugins[$type] ?? []);
+    }
+
+    /**
+     * Is the plugin of a deleted plugin type.
+     *
+     * @param string $pluginname
+     * @return bool true if deleted, false otherwise.
+     */
+    public static function is_deleted_plugin(string $pluginname): bool {
+        self::init();
+        [$type, $name] = self::normalize_component($pluginname);
+        return array_key_exists($name, self::$deletedplugins[$type] ?? []);
+    }
+
+    /**
      * Get list of plugins of given type.
      *
      * @param string $plugintype
@@ -933,6 +1208,28 @@ $cache = ' . var_export($cache, true) . ';
             return [];
         }
         return self::$plugins[$plugintype];
+    }
+
+    /**
+     * Get list of deprecated plugins of a given type.
+     *
+     * @param string $plugintype
+     * @return array as (string)pluginname => (string)fulldir
+     */
+    public static function get_deprecated_plugin_list($plugintype): array {
+        self::init();
+        return self::$deprecatedplugins[$plugintype] ?? [];
+    }
+
+    /**
+     * Get list of deleted plugins of a given type.
+     *
+     * @param string $plugintype
+     * @return array as (string)pluginname => (string)fulldir
+     */
+    public static function get_deleted_plugin_list($plugintype): array {
+        self::init();
+        return self::$deletedplugins[$plugintype] ?? [];
     }
 
     /**
@@ -1087,10 +1384,10 @@ $cache = ' . var_export($cache, true) . ';
 
         self::init();
 
-        if (!isset(self::$plugins[$plugintype][$pluginname])) {
+        if (!isset(self::$plugins[$plugintype][$pluginname]) && !isset(self::$deprecatedplugins[$plugintype][$pluginname])) {
             return null;
         }
-        return self::$plugins[$plugintype][$pluginname];
+        return self::$plugins[$plugintype][$pluginname] ?? self::$deprecatedplugins[$plugintype][$pluginname];
     }
 
     /**
@@ -1192,7 +1489,7 @@ $cache = ' . var_export($cache, true) . ';
      * @return null|string The component name, or null if a matching component was not found
      */
     public static function get_component_from_classname(string $classname): ?string {
-        $components = static::get_component_names(true);
+        $components = static::get_component_names(true, true);
 
         $classname = ltrim($classname, '\\');
 
@@ -1250,6 +1547,8 @@ $cache = ' . var_export($cache, true) . ';
     /**
      * Returns parent of this subplugin type.
      *
+     * No filtering is done on deprecated/deleted subtypes. Calling code should check this if needed.
+     *
      * @param string $type
      * @return string parent component or null
      */
@@ -1276,6 +1575,26 @@ $cache = ' . var_export($cache, true) . ';
         }
 
         return null;
+    }
+
+    /**
+     * Return all deprecated subplugins of this component.
+     * @param string $component.
+     * @return null|array $subtype=>array($component, ..), null if no subtypes defined
+     */
+    public static function get_deprecated_subplugins($component): ?array {
+        self::init();
+        return self::$deprecatedsubplugins[$component] ?? null;
+    }
+
+    /**
+     * Return all deleted subplugins of this component.
+     * @param string $component.
+     * @return null|array $subtype=>array($component, ..), null if no subtypes defined
+     */
+    public static function get_deleted_subplugins($component): ?array {
+        self::init();
+        return self::$deletedsubplugins[$component] ?? null;
     }
 
     /**
@@ -1588,10 +1907,12 @@ $cache = ' . var_export($cache, true) . ';
      * Note: By default the 'core' subsystem is not included.
      *
      * @param bool $includecore Whether to include the 'core' subsystem
+     * @param bool $includedeprecated Whether to include deprecated components
      * @return string[] the list of frankenstyle component names.
      */
     public static function get_component_names(
         bool $includecore = false,
+        bool $includedeprecated = false
     ): array {
         $componentnames = [];
         // Get all plugins.
@@ -1607,6 +1928,14 @@ $cache = ' . var_export($cache, true) . ';
 
         if ($includecore) {
             $componentnames[] = 'core';
+        }
+
+        if ($includedeprecated) {
+            foreach (self::get_deprecated_plugin_types() as $plugintype => $typedir) {
+                foreach (self::get_deprecated_plugin_list($plugintype) as $pluginname => $plugindir) {
+                    $componentnames[] = $plugintype . '_' . $pluginname;
+                }
+            }
         }
 
         return $componentnames;
