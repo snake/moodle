@@ -100,6 +100,7 @@ if ($options['list']) {
         $nextrun = $task->get_next_run_time();
         $lastrun = $task->get_last_run_time();
 
+        // TODO: get_all_scheduled_tasks omits those for deprecated plugins, so likely don't need to explicitly exclude those here.
         $plugininfo = core_plugin_manager::instance()->get_plugin_info($task->get_component());
         $plugindisabled = $plugininfo && $plugininfo->is_enabled() === false && !$task->get_run_if_component_disabled();
 
