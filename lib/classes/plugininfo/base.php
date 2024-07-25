@@ -86,6 +86,13 @@ abstract class base {
     /** @var string Name of the plugin */
     public $component = '';
 
+    //TODO: can we use one instance var and use constants in core_plugin_manager like we do for source?
+    /** @var bool whether the plugin is that of a deprecated type or subplugin type. */
+    public $deprecatedtype = false;
+
+    /** @var bool whether the plugin is that of a deleted type or subplugin type. */
+    public $deletedtype = false;
+
     /**
      * Whether this plugintype supports its plugins being disabled.
      *
@@ -143,15 +150,25 @@ abstract class base {
      * @return array of plugintype classes, indexed by the plugin name
      */
     public static function get_plugins($type, $typerootdir, $typeclass, $pluginman) {
-        // Get the information about plugins at the disk.
-        $plugins = core_component::get_plugin_list($type);
+        // Get the information about plugins at the disk, including deprecated plugins.
+        $plugins = array_merge(
+            core_component::get_plugin_list($type),
+            core_component::get_deprecated_plugin_list($type),
+            core_component::get_deleted_plugin_list($type)
+        );
+
+        // Also included deleted plugins.
+
         $return = array();
         foreach ($plugins as $pluginname => $pluginrootdir) {
             $return[$pluginname] = self::make_plugin_instance($type, $typerootdir,
                 $pluginname, $pluginrootdir, $typeclass, $pluginman);
         }
 
-        // Fetch missing incorrectly uninstalled plugins.
+        // TODO: check whether we end up falling into the code below when a deprecated plugin is removed from disk (or other ways).
+        //  I think that's actually preferable if we do, since then versiondisk won't be set and we'll report it correctly.
+        //  so likely no change required - just check.
+        // Fetch missing incorrectly uninstalled plugins, including deprecated plugins which are not included above.
         $plugins = $pluginman->get_installed_plugins($type);
 
         foreach ($plugins as $name => $version) {
@@ -168,6 +185,7 @@ abstract class base {
             $plugin->versiondb   = $version;
             $plugin->pluginman   = $pluginman;
             $plugin->init_is_standard();
+            $plugin->init_is_deprecated();
 
             $return[$name] = $plugin;
         }
@@ -199,6 +217,7 @@ abstract class base {
         $plugin->load_disk_version();
         $plugin->load_db_version();
         $plugin->init_is_standard();
+        $plugin->init_is_deprecated();
 
         return $plugin;
     }
@@ -270,7 +289,13 @@ abstract class base {
      * data) or is missing from disk.
      */
     public function load_disk_version() {
+        // Note: this includes deprecated plugins.
         $versions = $this->pluginman->get_present_plugins($this->type);
+
+//        // TODO: version need to be set on deprecated plugininfo
+//        if (empty($versions)) {
+//            $versions = $this->pluginman->get_deprecated_plugins($this->type);
+//        }
 
         $this->versiondisk = null;
         $this->versionrequires = null;
@@ -349,7 +374,7 @@ abstract class base {
      * @return string|bool false if not a subplugin, name of the parent otherwise
      */
     public function get_parent_plugin() {
-        return $this->pluginman->get_parent_of_subplugin($this->type);
+        return $this->pluginman->get_parent_of_subplugin($this->type, true);
     }
 
     /**
@@ -394,6 +419,18 @@ abstract class base {
                 $this->source = core_plugin_manager::PLUGIN_SOURCE_EXTENSION;
             }
         }
+    }
+
+    /**
+     * Sets {@link $deprecatedtype} property, indicating whether the plugintype is deprecated.
+     *
+     * @return void
+     */
+    public final function init_is_deprecated(): void {
+        // TODO: Unit test.
+        $this->deprecatedtype = \core_component::is_deprecated_plugin_type($this->type);
+        $this->deletedtype = \core_component::is_deleted_plugin_type($this->type);
+        $this->displayname = $this->deletedtype ? $this->name : $this->displayname;
     }
 
     /**
@@ -498,6 +535,24 @@ abstract class base {
         }
 
         return isset($enabled[$this->name]);
+    }
+
+    /**
+     * Return whether this plugin is deprecated (i.e. the plugin type to which it belongs is deprecated).
+     *
+     * @return bool
+     */
+    public function is_deprecated(): bool {
+        return $this->deprecatedtype;
+    }
+
+    /**
+     * Return whether this plugin is deleted (i.e. the plugin type to which it belongs is deleted).
+     *
+     * @return bool
+     */
+    public function is_deleted(): bool {
+        return $this->deletedtype;
     }
 
     /**
