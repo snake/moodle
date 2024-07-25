@@ -5593,4 +5593,90 @@ EOT;
             ],
         ];
     }
+
+    /**
+     * Test various moodlelib functions when dealing with a deprecated plugin type.
+     *
+     * @runInSeparateProcess
+     * @return void
+     */
+    public function test_moodlelib_deprecated_plugintype(): void {
+        $this->resetAfterTest();
+        global $CFG;
+
+        // Inject the 'fake' plugin type and deprecate it.
+        // Note: this method of injection is required to ensure core_component fully builds all caches from the ground up,
+        // which is necessary to test things like class autoloading, required for class callbacks checks.
+        $this->add_full_mocked_plugintype(
+            plugintype: 'fake',
+            path: 'lib/tests/fixtures/fakeplugins/fake',
+        );
+        $this->deprecate_full_mocked_plugintype('fake');
+
+        // Verify strings can be fetched for deprecated plugins.
+        $stringman = get_string_manager();
+        $this->assertEquals('Fake full featured plugin', $stringman->get_string('pluginname', 'fake_fullfeatured'));
+
+        // Verify callbacks are NOT supported for deprecated plugins (falling back to using the default return).
+        $this->assertFalse(component_callback_exists('fake_fullfeatured', 'test_callback'));
+        $this->assertEquals('default', component_callback('fake_fullfeatured', 'test_callback', [], 'default'));
+        $this->assertEquals('cat', component_class_callback(\fake_fullfeatured\dummy::class, 'class_callback_test', [], 'cat'));
+
+        // Unset allversionshash to trigger a plugin functions rebuild, forcing it to pick up the injected mock plugin functions.
+        unset($CFG->allversionshash);
+        $plugins = get_plugins_with_function('test_callback');
+        $this->assertArrayNotHasKey('fake', $plugins);
+        $pluginlist = get_plugin_list_with_function('fake', 'test_callback');
+        $this->assertArrayNotHasKey('fake_fullfeatured', $pluginlist);
+
+
+        require_once($CFG->libdir . '/upgradelib.php');
+        external_update_descriptions('fake_fullfeatured');
+
+        ///$result = \fake_fullfeatured\external\service_test::execute();
+        $result = \core_external\external_api::call_external_function('fake_fullfeatured_service_test', []);
+        //$result = \core_external\external_api::clean_returnvalue(\fake_fullfeatured\external\service_test::execute_returns(), $result);
+        $this->assertArrayHasKey('error', $result);
+        $this->assertFalse($result['error']);
+        $this->assertArrayHasKey('data', $result);
+        $this->assertEquals('fake_fullfeatured service result', $result['data']['result']);
+    }
+
+    /**
+     * Test various moodlelib functions when dealing with a deleted plugin type.
+     *
+     * @runInSeparateProcess
+     * @return void
+     */
+    public function test_moodlelib_deleted_plugintype(): void {
+        $this->resetAfterTest();
+        global $CFG;
+
+        // Inject the 'fake' plugin type and flag it as deleted.
+        // Note: this deep method of injection is required to ensure core_component fully builds all caches from the ground up,
+        // which is necessary to test things like class autoloading, required for class callbacks checks.
+        $this->add_full_mocked_plugintype(
+            plugintype: 'fake',
+            path: 'lib/tests/fixtures/fakeplugins/fake',
+        );
+        $this->delete_full_mocked_plugintype('fake');
+
+        // Verify no string support for deleted plugins.
+        $stringman = get_string_manager();
+        $this->assertEquals('[[pluginname]]', $stringman->get_string('pluginname', 'fake_fullfeatured'));
+        $this->assertDebuggingCalled();
+
+        // Verify callbacks are NOT supported for deleted plugins (falling back to using the default return).
+        $this->assertFalse(component_callback_exists('fake_fullfeatured', 'test_callback'));
+        $this->assertEquals('default', component_callback('fake_fullfeatured', 'test_callback', [], 'default'));
+        $this->assertEquals('default',
+            component_class_callback(\fake_fullfeatured\dummy::class, 'class_callback_test', [], 'default'));
+
+        // Unset allversionshash to trigger a plugin functions rebuild, forcing it to pick up the injected mock plugin functions.
+        unset($CFG->allversionshash);
+        $plugins = get_plugins_with_function('test_callback');
+        $this->assertArrayNotHasKey('fake', $plugins);
+        $pluginlist = get_plugin_list_with_function('fake', 'test_callback');
+        $this->assertArrayNotHasKey('fake_fullfeatured', $pluginlist);
+    }
 }
