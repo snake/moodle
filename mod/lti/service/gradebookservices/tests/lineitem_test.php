@@ -266,6 +266,106 @@ class lineitem_test extends \advanced_testcase {
     }
 
     /**
+     * Test highlighting the impact of lineitem updated on lineitems and on subsquent score posts.
+     *
+     * @return void
+     */
+    public function test_lineitem_update_rescale_grades(): void {
+        global $CFG;
+        require_once($CFG->dirroot . '/mod/lti/locallib.php');
+        $this->resetAfterTest();
+        $resourceid = 'test-resource-id';
+        $tag = 'tag';
+        $course = $this->getDataGenerator()->create_course();
+        $typeid = $this->create_type();
+        $user = $this->getDataGenerator()->create_and_enrol($course);
+
+        // Create mod instance with line item - nothing pushed via services yet.
+        $gbservice = new gradebookservices();
+        $gbservice->set_type(lti_get_type($typeid));
+        $modinstance = $this->create_graded_lti($typeid, $course, $resourceid, $tag);
+        $gradeitems = $gbservice->get_lineitems($course->id, null, null, null, null, null, $typeid);
+        $this->assertEquals(1, $gradeitems[0]); // The 1st item in the array is the items count.
+        $lineitem = gradebookservices::item_for_json($gradeitems[1][0], '', $typeid);
+
+        // Post a score so that there's at least one grade present at the time of lineitem update.
+        $score = new scores($gbservice);
+        $_SERVER['REQUEST_METHOD'] = \mod_lti\local\ltiservice\resource_base::HTTP_POST;
+        $_SERVER['PATH_INFO'] = "/$course->id/lineitems/{$gradeitems[1][0]->id}/lineitem/scores?type_id=$typeid";
+        $token = lti_new_access_token($typeid, ['https://purl.imsglobal.org/spec/lti-ags/scope/score']);
+        $_SERVER['HTTP_Authorization'] = 'Bearer '.$token->token;
+        $_GET['type_id'] = (string)$typeid;
+        $score->scoreGiven = "8.0";
+        $score->scoreMaximum = "10.0";
+        $score->activityProgress = "Completed";
+        $score->timestamp = "2024-08-07T18:54:36.736+00:00";
+        $score->gradingProgress = "FullyGraded";
+        $score->userId = $user->id;
+        $response = new \mod_lti\local\ltiservice\response();
+        $response->set_content_type('application/vnd.ims.lis.v1.score+json');
+        $response->set_request_data(json_encode($score));
+        $score->execute($response);
+
+        // The grade in Moodle should reflect the score->timestamp, not the time of the score post.
+        $grades = grade_get_grades($course->id, 'mod', 'lti', $modinstance->id, $user->id);
+        $studentgrade = array_shift($grades->items[0]->grades);
+        $this->assertEquals(strtotime($score->timestamp), $studentgrade->dategraded);
+
+        // Required, to ensure that the line item update + rescale takes place at a different timestamp to the original score push.
+        sleep(1);
+
+        // Next, push an update to the maximum score for the line item.
+        // This will trigger a rescale, setting grade->timemodified to the time the rescale took place.
+        $lineitemresource = new lineitem($gbservice);
+        $this->set_server_for_put($course, $typeid, $lineitem);
+        $response = new \mod_lti\local\ltiservice\response();
+        $lineitem->resourceId = $resourceid.'modified';
+        $lineitem->tag = $tag.'modified';
+        $lineitem->scoreMaximum = '20'; // Change the lineitem to make sure a rescale is triggered.
+        $response->set_request_data(json_encode($lineitem));
+        $lineitemupdatetime = time();
+        $lineitemresource->execute($response);
+
+        $grades = grade_get_grades($course->id, 'mod', 'lti', $modinstance->id, $user->id);
+        $studentgrade = array_shift($grades->items[0]->grades);
+        // The grade->timemodified value, which dictates the value of $studentgrade->dategraded,
+        // has been updated to the time the rescale took place.
+        $this->assertGreaterThanOrEqual($lineitemupdatetime, $studentgrade->dategraded);
+
+        // Now, try to post a score update with a timestamp that is greater than the one used in the original score post,
+        // but which is less than the timestamp at which the rescale event took place.
+        // I.e. (timestamp > '2024-08-07T18:54:36.736+00:00' && timestamp < $lineitemupdatetime).
+        $_SERVER['REQUEST_METHOD'] = \mod_lti\local\ltiservice\resource_base::HTTP_POST;
+        $_SERVER['PATH_INFO'] = "/$course->id/lineitems/{$gradeitems[1][0]->id}/lineitem/scores?type_id=$typeid";
+        $token = lti_new_access_token($typeid, ['https://purl.imsglobal.org/spec/lti-ags/scope/score']);
+        $_SERVER['HTTP_Authorization'] = 'Bearer '.$token->token;
+        $_GET['type_id'] = (string)$typeid;
+        $score->scoreGiven = "14";
+        $score->timestamp = date('c', $lineitemupdatetime-1);
+        $response = new \mod_lti\local\ltiservice\response();
+        $response->set_content_type('application/vnd.ims.lis.v1.score+json');
+        $response->set_request_data(json_encode($score));
+        $score->execute($response);
+        // The tool should be able to post a score update.
+        $this->assertEquals(200, json_decode($response->get_code()));
+
+        // The only way to post a score update after a rescale event is by setting score->timestamp to a value which is greater than
+        // the time at which the rescale took place (score->timestamp > $lineitemupdatetime).
+        $_SERVER['REQUEST_METHOD'] = \mod_lti\local\ltiservice\resource_base::HTTP_POST;
+        $_SERVER['PATH_INFO'] = "/$course->id/lineitems/{$gradeitems[1][0]->id}/lineitem/scores?type_id=$typeid";
+        $token = lti_new_access_token($typeid, ['https://purl.imsglobal.org/spec/lti-ags/scope/score']);
+        $_SERVER['HTTP_Authorization'] = 'Bearer '.$token->token;
+        $_GET['type_id'] = (string)$typeid;
+        $score->scoreGiven = "14";
+        $score->timestamp = date('c', $lineitemupdatetime+1);
+        $response = new \mod_lti\local\ltiservice\response();
+        $response->set_content_type('application/vnd.ims.lis.v1.score+json');
+        $response->set_request_data(json_encode($score));
+        $score->execute($response);
+        $this->assertEquals(200, json_decode($response->get_code()));
+    }
+
+    /**
      * Inserts a graded lti instance, which should create a grade_item and gradebookservices record.
      *
      * @param int $typeid Type ID of the LTI Tool.
