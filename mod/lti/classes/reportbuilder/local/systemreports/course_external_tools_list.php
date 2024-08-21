@@ -60,10 +60,12 @@ class course_external_tools_list extends system_report {
         // We need id and course in the actions column, without entity prefixes, so add these here.
         // We also need access to the tool usage count in a few places (the usage column as well as the actions column).
         $ti = database::generate_param_name(); // Tool instance param.
+        $tic = database::generate_param_name(); // Tool instance course param.
         $this->add_base_fields("{$entitymainalias}.id, {$entitymainalias}.course, ".
             "(SELECT COUNT($ti.id)
                 FROM {lti} $ti
-                WHERE $ti.typeid = {$entitymainalias}.id) AS toolusage");
+                WHERE $ti.typeid = {$entitymainalias}.id
+                  AND $ti.course = :{$tic}) AS toolusage");
 
         // Join the types_categories table, to include only tools available to the current course's category.
         $cattablealias = database::generate_alias();
@@ -84,6 +86,7 @@ class course_external_tools_list extends system_report {
         $params = array_merge(
             $params,
             [
+                $tic => $this->course->id,
                 $coursevisibleparam => LTI_COURSEVISIBLE_NO,
                 $categoryparam => $this->course->category,
                 $toolstateparam => LTI_TOOL_STATE_CONFIGURED
