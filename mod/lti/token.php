@@ -111,6 +111,7 @@ EOD;
 EOD;
 }
 
+$response->set_content_type('application/json');
 $response->set_body($body);
 
 $response->send();
