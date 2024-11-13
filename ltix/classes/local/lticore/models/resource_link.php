@@ -36,6 +36,8 @@ namespace core_ltix\local\lticore\models;
 
 use core\persistent;
 use core\uuid;
+use core_ltix\local\lticore\messages\lti_message;
+use core_ltix\local\lticore\messages\lti_resource_link_request;
 
 /**
  * Resource link persistent.
@@ -44,7 +46,7 @@ use core\uuid;
  * @copyright  2024 Jake Dallimore <jrhdallimore@gmail.com>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
-class resource_link extends persistent {
+final class resource_link extends persistent {
 
     /** @var string The table name. */
     public const TABLE = 'lti_resource_link';
@@ -55,6 +57,15 @@ class resource_link extends persistent {
 
         return [
             'typeid' => [
+                'type' => PARAM_INT,
+            ],
+            'component' => [
+                'type' => PARAM_COMPONENT,
+            ],
+            'itemtype' => [
+                'type' => PARAM_ALPHANUMEXT,
+            ],
+            'itemid' => [
                 'type' => PARAM_INT,
             ],
             'contextid' => [
@@ -92,6 +103,10 @@ class resource_link extends persistent {
                     FORMAT_PLAIN,
                     FORMAT_MARKDOWN,
                 ],
+            ],
+            'gradable' => [
+                'type' => PARAM_BOOL,
+                'default' => false,
             ],
             'launchcontainer' => [
                 'type' => PARAM_INT,

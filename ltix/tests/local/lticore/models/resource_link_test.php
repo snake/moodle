@@ -79,12 +79,18 @@ class resource_link_test extends \advanced_testcase {
             'minimal set, required fields only' => [
                 'setdata' => [
                     'typeid' => 4,
+                    'component' => 'mod_lti',
+                    'itemtype' => 'example_item_type',
+                    'itemid' => 432,
                     'contextid' => 33,
                     'url' => (new \moodle_url('http://tool.example.com/my/resource'))->out(false),
                     'title' => 'My resource',
                 ],
                 'expecteddata' => [
                     'typeid' => 4,
+                    'component' => 'mod_lti',
+                    'itemtype' => 'example_item_type',
+                    'itemid' => 432,
                     'contextid' => 33,
                     'legacyid' => null,
                     // Note: can't check UUID in this case since it's a randomly generated default, so it's omitted.
@@ -92,6 +98,7 @@ class resource_link_test extends \advanced_testcase {
                     'title' => 'My resource',
                     'text' => null,
                     'textformat' => FORMAT_MOODLE,
+                    'gradable' => false,
                     'launchcontainer' => LTI_LAUNCH_CONTAINER_DEFAULT,
                     'customparams' => null,
                     'icon' => null,
@@ -101,6 +108,9 @@ class resource_link_test extends \advanced_testcase {
             'full set, all fields specified' => [
                 'setdata' => [
                     'typeid' => 4,
+                    'component' => 'mod_lti',
+                    'itemtype' => 'example_item_type',
+                    'itemid' => 432,
                     'contextid' => 33,
                     'legacyid' => 56001,
                     'uuid' => '123',
@@ -108,6 +118,7 @@ class resource_link_test extends \advanced_testcase {
                     'title' => 'My resource',
                     'text' => '<div>This is a larger description of the resource link</div>',
                     'textformat' => FORMAT_HTML,
+                    'gradable' => true,
                     'launchcontainer' => LTI_LAUNCH_CONTAINER_EMBED_NO_BLOCKS,
                     'customparams' => 'id=abc-123-fff',
                     'icon' => (new \moodle_url('http://tool.example.com/my/resource/icon.png'))->out(false),
@@ -115,6 +126,9 @@ class resource_link_test extends \advanced_testcase {
                 ],
                 'expecteddata' => [
                     'typeid' => 4,
+                    'component' => 'mod_lti',
+                    'itemtype' => 'example_item_type',
+                    'itemid' => 432,
                     'contextid' => 33,
                     'legacyid' => 56001,
                     'uuid' => '123',
@@ -122,6 +136,7 @@ class resource_link_test extends \advanced_testcase {
                     'title' => 'My resource',
                     'text' => '<div>This is a larger description of the resource link</div>',
                     'textformat' => FORMAT_HTML,
+                    'gradable' => true,
                     'launchcontainer' => LTI_LAUNCH_CONTAINER_EMBED_NO_BLOCKS,
                     'customparams' => 'id=abc-123-fff',
                     'icon' => 'http://tool.example.com/my/resource/icon.png',
