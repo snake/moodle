@@ -1536,5 +1536,69 @@ function xmldb_main_upgrade($oldversion) {
         upgrade_main_savepoint(true, 2024100700.03);
     }
 
+    if ($oldversion < 2024100700.04) {
+        // If mod_lti is present, migrate the relevant link data to the replacement table in core_ltix.
+        // This needs to be done as a core step, so that this information is present when installing new services, some of which
+        // require re-linking to this data (e.g. ltixservice_gradebookservices).
+        if (file_exists($CFG->dirroot . '/mod/lti/version.php')) {
+            $table = new xmldb_table('lti_resource_link');
+
+            // Drop the UUID index, allowing field modification below.
+            $index = new xmldb_index('uuid_index', XMLDB_INDEX_UNIQUE, ['uuid']);
+
+            // Conditionally launch drop index uuid_index.
+            if ($dbman->index_exists($table, $index)) {
+                $dbman->drop_index($table, $index);
+            }
+
+            // Modify the field, permitting nulls, allowing migrating data without a UUID initially.
+            $field = new xmldb_field(
+                name: 'uuid',
+                type: XMLDB_TYPE_CHAR,
+                precision: '36',
+                notnull:  false,
+            );
+            $dbman->change_field_notnull($table, $field);
+
+            $sql = "INSERT INTO {lti_resource_link} (typeid, component, itemtype, itemid, contextid, legacyid, url, title, text,
+                                 textformat, gradable, launchcontainer, customparams, icon, servicesalt)
+                         SELECT lti.typeid, :component, :itemtype, lti.id, ctx.id, lti.id, lti.toolurl, lti.name, lti.intro,
+                                lti.introformat, :gradable, lti.launchcontainer, lti.instructorcustomparameters, lti.icon,
+                                lti.servicesalt
+                           FROM {lti} lti
+                           JOIN {context} ctx ON (ctx.instanceid = lti.course)
+                          WHERE ctx.contextlevel = :contextlevel";
+            $DB->execute($sql, [
+                'component' => 'mod_lti',
+                'itemtype' => 'activity',
+                'gradable' => true,
+                'contextlevel' => CONTEXT_COURSE,
+            ]);
+
+            $ltirs = $DB->get_recordset('lti', null, '', 'id');
+            foreach ($ltirs as $ltirecord) {
+                $DB->set_field('lti_resource_link', 'uuid', \core\uuid::generate(), ['legacyid' => $ltirecord->id]);
+            }
+            $ltirs->close();
+
+            // Restore the notnull for UUID.
+            $field = new xmldb_field(
+                name: 'uuid',
+                type: XMLDB_TYPE_CHAR,
+                precision: '36',
+                notnull:  XMLDB_NOTNULL,
+            );
+            $dbman->change_field_notnull($table, $field);
+
+            // Conditionally launch add index uuid_index.
+            if (!$dbman->index_exists($table, $index)) {
+                $dbman->add_index($table, $index);
+            }
+        }
+
+        // Main savepoint reached.
+        upgrade_main_savepoint(true, 2024100700.04);
+    }
+
     return true;
 }
