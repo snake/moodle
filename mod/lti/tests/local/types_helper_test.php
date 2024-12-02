@@ -84,20 +84,20 @@ class helper_test extends lti_testcase {
         $ltigenerator->create_tool_types([
             'name' => 'site tool do not show',
             'baseurl' => 'http://example.com/tool/1',
-            'coursevisible' => LTI_COURSEVISIBLE_NO,
-            'state' => LTI_TOOL_STATE_CONFIGURED
+            'coursevisible' => \core_ltix\constants::LTI_COURSEVISIBLE_NO,
+            'state' => \core_ltix\constants::LTI_TOOL_STATE_CONFIGURED
         ]);
         $ltigenerator->create_tool_types([
             'name' => 'site tool preconfigured only',
             'baseurl' => 'http://example.com/tool/2',
-            'coursevisible' => LTI_COURSEVISIBLE_PRECONFIGURED,
-            'state' => LTI_TOOL_STATE_CONFIGURED
+            'coursevisible' => \core_ltix\constants::LTI_COURSEVISIBLE_PRECONFIGURED,
+            'state' => \core_ltix\constants::LTI_TOOL_STATE_CONFIGURED
         ]);
         $ltigenerator->create_tool_types([
             'name' => 'site tool preconfigured and activity chooser',
             'baseurl' => 'http://example.com/tool/3',
-            'coursevisible' => LTI_COURSEVISIBLE_ACTIVITYCHOOSER,
-            'state' => LTI_TOOL_STATE_CONFIGURED
+            'coursevisible' => \core_ltix\constants::LTI_COURSEVISIBLE_ACTIVITYCHOOSER,
+            'state' => \core_ltix\constants::LTI_TOOL_STATE_CONFIGURED
         ]);
         $ltigenerator->create_course_tool_types([
             'name' => 'course tool preconfigured and activity chooser',
@@ -107,8 +107,8 @@ class helper_test extends lti_testcase {
         $ltigenerator->create_tool_types([
             'name' => 'site tool preconfigured and activity chooser, restricted to category 2',
             'baseurl' => 'http://example.com/tool/5',
-            'coursevisible' => LTI_COURSEVISIBLE_ACTIVITYCHOOSER,
-            'state' => LTI_TOOL_STATE_CONFIGURED,
+            'coursevisible' => \core_ltix\constants::LTI_COURSEVISIBLE_ACTIVITYCHOOSER,
+            'state' => \core_ltix\constants::LTI_TOOL_STATE_CONFIGURED,
             'lti_coursecategories' => $coursecat2->id
         ]);
 
@@ -128,7 +128,7 @@ class helper_test extends lti_testcase {
 
         // Request for only those tools configured to show in the activity chooser for the teacher.
         $coursetooltypes = types_helper::get_lti_types_by_course($course->id, $teacher->id,
-            [LTI_COURSEVISIBLE_ACTIVITYCHOOSER]);
+            [\core_ltix\constants::LTI_COURSEVISIBLE_ACTIVITYCHOOSER]);
         $this->assertCount(2, $coursetooltypes);
         $expected = [
             'http://example.com/tool/3',
@@ -141,7 +141,7 @@ class helper_test extends lti_testcase {
 
         // Request for only those tools configured to show as a preconfigured tool for the teacher.
         $coursetooltypes = types_helper::get_lti_types_by_course($course->id, $teacher->id,
-            [LTI_COURSEVISIBLE_PRECONFIGURED]);
+            [\core_ltix\constants::LTI_COURSEVISIBLE_PRECONFIGURED]);
         $this->assertCount(1, $coursetooltypes);
         $expected = [
             'http://example.com/tool/2',
