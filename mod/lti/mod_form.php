@@ -329,12 +329,24 @@ class mod_lti_mod_form extends moodleform_mod {
             }
         }
 
+        // Domain matched but the instance typeid is null - this happens after a backup/restore.
+        // In such cases, we don't want to use the legacy form, since we're confident we have a typeid.
+        $domainmatchedfromrestore = false;
+        if (empty($this->current->typeid) && empty($this->typeid) && !empty($this->current->toolurl)) {
+            $tool = lti_get_tool_by_url_match($this->current->toolurl);
+            if ($tool !== null) {
+                $this->current->typeid = $tool->id;
+                $domainmatchedfromrestore = true;
+            }
+        }
+
+
         // Display the legacy form, presenting a read-only view of the configuration for unsupported (since 4.3) instances, which:
         // - Are manually configured instances (no longer supported. course tools should be configured and used instead).
         // - Are domain-matched to a hidden site level tool (no longer supported. to be replaced by URL-based course tool creation)
         // Instances based on preconfigured tools and which are not domain matched as above, are still valid and will be shown using
         // the non-legacy form.
-        if ($manualinstance || $matchestoolnotavailabletocourse) {
+        if (!$domainmatchedfromrestore && ($manualinstance || $matchestoolnotavailabletocourse)) {
             $this->legacy_instance_form_definition($instancetypes);
             return;
         }
