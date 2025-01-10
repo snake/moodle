@@ -159,6 +159,8 @@ $string['manage_tools'] = 'Manage preconfigured tools';
 $string['manage_tool_proxies'] = 'Manage external tool registrations';
 $string['manuallyaddtype'] = 'Alternatively, you can <a href="{$a}">configure a tool manually</a>.';
 $string['miscellaneous'] = 'Miscellaneous';
+$string['model:validation:fieldrequiredforltiversion'] = 'Field is required for LTI version {$a}.';
+$string['model:validation:fieldincompatiblewithltiversion'] = 'Field is incompatible with LTI version {$a}.';
 $string['name'] = 'Name';
 $string['never'] = 'Never';
 $string['new_window'] = 'New window';

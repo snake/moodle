@@ -1560,6 +1560,10 @@ function xmldb_main_upgrade($oldversion) {
             );
             $dbman->change_field_notnull($table, $field);
 
+            // Note: typeid = null records are excluded since those represent legacy, manually configured tool links,
+            // a feature not supported by core_ltix.
+            // TODO: how are legacy, manually configured links going to be launchable if not by core_ltix?
+            //  Might be able to use the lti_1p1_launch_builder, when it's created, to do this...
             $sql = "INSERT INTO {lti_resource_link} (typeid, component, itemtype, itemid, contextid, legacyid, url, title, text,
                                  textformat, gradable, launchcontainer, customparams, icon, servicesalt)
                          SELECT lti.typeid, :component, :itemtype, lti.id, ctx.id, lti.id, lti.toolurl, lti.name, lti.intro,
@@ -1567,7 +1571,8 @@ function xmldb_main_upgrade($oldversion) {
                                 lti.servicesalt
                            FROM {lti} lti
                            JOIN {context} ctx ON (ctx.instanceid = lti.course)
-                          WHERE ctx.contextlevel = :contextlevel";
+                          WHERE ctx.contextlevel = :contextlevel
+                            AND lti.typeid IS NOT NULL";
             $DB->execute($sql, [
                 'component' => 'mod_lti',
                 'itemtype' => 'activity',
@@ -1594,6 +1599,8 @@ function xmldb_main_upgrade($oldversion) {
             if (!$dbman->index_exists($table, $index)) {
                 $dbman->add_index($table, $index);
             }
+
+            // Update the ltiid for
         }
 
         // Main savepoint reached.

@@ -25,6 +25,8 @@
 
 namespace ltixservice_gradebookservices\local\service;
 
+use core\context;
+use core_ltix\local\lticore\models\resource_link;
 use ltixservice_gradebookservices\local\resources\lineitem;
 use ltixservice_gradebookservices\local\resources\lineitems;
 use ltixservice_gradebookservices\local\resources\results;
@@ -180,6 +182,42 @@ class gradebookservices extends service_base {
         return [$targetlinkuri, $customstr];
     }
 
+    public function override_target_link_uri(
+        \stdClass $toolconfig,
+        string $messagetype,
+        string $targetlinkuri,
+        context $context,
+        int $userid,
+        ?resource_link $resourcelink = null
+    ): string {
+
+        // For a submission review launch, AGS changes the target_link_uri to that of the line item's submission review URL, if set.
+        // Otherwise, it falls back to the URL used when performing a resource link launch.
+        // Note: Moodle doesn't support submission review launches for standalone line items (not associated with a resource links).
+        // See the relevant part of the spec, here: https://www.imsglobal.org/spec/lti-sr/v1p0#target-link-uri.
+        if ($messagetype === 'LtiSubmissionReviewRequest' && !is_null($resourcelink) && $resourcelink->is_gradable()) {
+
+            // The following will return false if the context can't return a course.
+            // A retrievable course context is an expectation for a gradable resource link.
+            if (($course = $context->get_course_context(false)) !== false) {
+                // TODO: Make sure that ltixservice_gradebookservices is updated to point to the migrated lti_resource_link records,
+                //  otherwise this query won't work!
+                global $DB;
+                $conditions = ['courseid' => $course->id, 'ltilinkid' => $resourcelink->get('uuid')];
+                $coupledlineitems = $DB->get_records('ltixservice_gradebookservices', $conditions);
+
+                if (count($coupledlineitems) == 1) {
+                    $item = reset($coupledlineitems);
+                    $url = $item->subreviewurl;
+                    if (!empty($url) && $url != 'DEFAULT') {
+                        $targetlinkuri = $url;
+                    }
+                }
+            }
+        }
+        return $targetlinkuri;
+    }
+
     /**
      * Return an array of key/claim mapping allowing LTI 1.1 custom parameters
      * to be transformed to LTI 1.3 claims.
@@ -288,6 +326,59 @@ class gradebookservices extends service_base {
             }
         }
         return $launchparameters;
+    }
+
+    public function get_launch_params(
+        \stdClass $toolconfig,
+        string $messagetype,
+        string $targetlinkuri,
+        context $context,
+        int $userid,
+        ?resource_link $resourcelink = null
+    ): array {
+        // TODO: also need to fetch and include the submission review params in this method, given override_target_link_uri()
+        //  doesn't do it any more.
+//        global $DB;
+//        $launchparameters = array();
+//        $this->set_type(\core_ltix\helper::get_type($typeid));
+//        $this->set_typeconfig(\core_ltix\helper::get_type_config($typeid));
+//        // Only inject parameters if the service is enabled for this tool.
+//        if (isset($this->get_typeconfig()['ltixservice_gradesynchronization'])) {
+//            if ($this->get_typeconfig()['ltixservice_gradesynchronization'] == self::GRADEBOOKSERVICES_READ ||
+//                $this->get_typeconfig()['ltixservice_gradesynchronization'] == self::GRADEBOOKSERVICES_FULL) {
+//                // Check for used in context is only needed because there is no explicit site tool - course relation.
+//                if ($this->is_allowed_in_context($typeid, $courseid)) {
+//                    $id = null;
+//                    if (!is_null($modlti)) {
+//                        $conditions = array('courseid' => $courseid, 'itemtype' => 'mod',
+//                            'itemmodule' => 'lti', 'iteminstance' => $modlti);
+//
+//                        $coupledlineitems = $DB->get_records('grade_items', $conditions);
+//                        $conditionsgbs = array('courseid' => $courseid, 'ltilinkid' => $modlti);
+//                        $lineitemsgbs = $DB->get_records('ltixservice_gradebookservices', $conditionsgbs);
+//                        // If a link has more that one attached grade items, per spec we do not populate line item url.
+//                        if (count($lineitemsgbs) == 1) {
+//                            $id = reset($lineitemsgbs)->gradeitemid;
+//                        }
+//                        if (count($lineitemsgbs) < 2 && count($coupledlineitems) == 1) {
+//                            $coupledid = reset($coupledlineitems)->id;
+//                            if (!is_null($id) && $id != $coupledid) {
+//                                $id = null;
+//                            } else {
+//                                $id = $coupledid;
+//                            }
+//                        }
+//                    }
+//                    $launchparameters['gradebookservices_scope'] = implode(',', $this->get_permitted_scopes());
+//                    $launchparameters['lineitems_url'] = '$LineItems.url';
+//                    if (!is_null($id)) {
+//                        $launchparameters['lineitem_url'] = '$LineItem.url';
+//                    }
+//                }
+//            }
+//        }
+//        return $launchparameters;
+        return [];
     }
 
     /**

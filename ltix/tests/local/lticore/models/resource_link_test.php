@@ -45,7 +45,7 @@ namespace core_ltix\local\lticore\models;
 class resource_link_test extends \advanced_testcase {
 
     /**
-     * Test creation using the bare minimum number of fields (those required).
+     * Test creation.
      *
      * @dataProvider create_resource_link_provider
      * @return void

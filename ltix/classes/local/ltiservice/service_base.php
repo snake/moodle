@@ -26,6 +26,8 @@
 
 namespace core_ltix\local\ltiservice;
 
+use core\context;
+use core_ltix\local\lticore\models\resource_link;
 use stdClass;
 
 
@@ -264,6 +266,17 @@ abstract class service_base {
         return [$targetlinkuri, $customstr];
     }
 
+    public function override_target_link_uri(
+        \stdClass $toolconfig,
+        string $messagetype,
+        string $targetlinkuri,
+        context $context,
+        int $userid,
+        ?resource_link $resourcelink = null
+    ): string {
+        return $targetlinkuri;
+    }
+
     /**
      * Called when a new LTI Instance is deleted.
      *
@@ -343,6 +356,17 @@ abstract class service_base {
      */
     public function get_launch_parameters($messagetype, $courseid, $userid, $typeid, $modlti = null) {
         return array();
+    }
+
+    public function get_launch_params(
+        \stdClass $toolconfig,
+        string $messagetype,
+        string $targetlinkuri,
+        context $context,
+        int $userid,
+        ?resource_link $resourcelink = null
+    ): array {
+        return [];
     }
 
     /**

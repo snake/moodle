@@ -1704,7 +1704,7 @@ class helper {
     public static function get_type_type_config($id) {
         global $DB;
 
-        $basicltitype = $DB->get_record('lti_types', array('id' => $id));
+        $basicltitype = $DB->get_record('lti_types', array('id' => $id), '*', MUST_EXIST);
         $config = self::get_type_config($id);
 
         $type = new \stdClass();
@@ -2093,6 +2093,132 @@ class helper {
             return $tool;
         }
         return self::get_type($instance->typeid);
+    }
+
+    /**
+     * Get those claims used in all lti messages and which are generally required.
+     *
+     * Must be claims that are generic and used in all lti messages. Note: this includes things like version, deployment_id and
+     * others which, despite not being listed as applicable to all message types in the core spec, in fact, behave as such.
+     *
+     * @param \stdClass $toolregistration
+     * @param string $messagetype
+     * @return array
+     */
+    public static function get_lti_message_standard_claims(\stdClass $toolregistration, string $messagetype,
+            string $issuer): array {
+
+        // Note: roles are omitted here because these cannot be calculated in a generic way.
+
+        $prefix = \core_ltix\constants::LTI_JWT_CLAIM_PREFIX;
+        return [
+            'tool_registration_id' => $toolregistration->id, // Moodle-specific.
+            'iss' => $issuer,
+            'aud' => $toolregistration->lti_clientid,
+            "$prefix/claim/message_type" => $messagetype, // https://www.imsglobal.org/spec/lti/v1p3#message-type-and-schemas.
+            "$prefix/claim/deployment_id" => $toolregistration->id, // Used in every message.
+            "$prefix/claim/version" => $toolregistration->lti_ltiversion, // Used in every message.
+            "nonce" => bin2hex(random_string(10)), // Uniqueness of the message hint payload from request to request.
+        ];
+    }
+
+    /**
+     * A context-based IMS role assignment helper for LTI 1.3 ONLY. This is not compatible with legacy roles.
+     *
+     * The logic here is based on the legacy role calc code in {@see self::get_ims_role()} and {@see oauth_helper::sign_jwt()}.
+     *
+     * @param int $userid
+     * @param \core\context $context
+     * @return array
+     * @throws coding_exception
+     */
+    public static function get_lti_message_roles(int $userid, \core\context $context): array {
+        $roles = [];
+
+        // moodle/ltix:manage is granted at mod level.
+        // TODO: create a tracker to address the capability migration stuff.
+        //  Do we want launch to be handled at mod-level as the 'usual' context? Probably not. Probably better as course.
+
+        // Previously, cmid would be present in resource link launch.
+        // Cmid would be omitted if doing a deep linking launch, where no cmid existed yet.
+        if (has_capability('moodle/ltix:manage', $context, $userid)) {
+            array_push($roles, 'Instructor');
+        } else {
+            array_push($roles, 'Learner');
+        }
+
+        if (has_capability('moodle/ltix:admin', $context, $userid)) {
+            // Explicitly defined admins: drop the learner role and always granted IMS admin role.
+            $roles = array_diff($roles, array('Learner'));
+            array_push($roles, 'urn:lti:sysrole:ims/lis/Administrator', 'urn:lti:instrole:ims/lis/Administrator');
+        } else if (is_siteadmin($userid)) {
+            // De-facto admins (is an admin in Moodle): drop the learner role and conditionally grant IMS admin role.
+            // Here, an additional check is required in course-specific contexts to support the 'loginas' feature.
+            // If not in a course-related context, the IMS roles is always added.
+            $roles = array_diff($roles, array('Learner'));
+            $coursecontext = $context->get_course_context(false); // Will return false if course context not applicable.
+            if (($coursecontext && !is_role_switched($coursecontext->instanceid)) || !$coursecontext) {
+                array_push($roles, 'urn:lti:sysrole:ims/lis/Administrator', 'urn:lti:instrole:ims/lis/Administrator');
+            }
+        }
+
+        // Convert shortnames to correct full name + fix legacy role names.
+        $finalroles = [];
+        foreach ($roles as $role) {
+            if (strpos($role, 'urn:lti:role:ims/lis/') === 0) {
+                $role = 'http://purl.imsglobal.org/vocab/lis/v2/membership#' . substr($role, 21);
+            } else if (strpos($role, 'urn:lti:instrole:ims/lis/') === 0) {
+                $role = 'http://purl.imsglobal.org/vocab/lis/v2/institution/person#' . substr($role, 25);
+            } else if (strpos($role, 'urn:lti:sysrole:ims/lis/') === 0) {
+                $role = 'http://purl.imsglobal.org/vocab/lis/v2/system/person#' . substr($role, 24);
+            } else if ((strpos($role, '://') === false) && (strpos($role, 'urn:') !== 0)) {
+                $role = "http://purl.imsglobal.org/vocab/lis/v2/membership#{$role}";
+            }
+            $finalroles[] = $role;
+        }
+
+        return $finalroles;
+    }
+
+    // TODO: do we need this method?
+    public static function get_token_claims_for_launch(string $messagetype, string $nonce): array {
+        $prefix = LTI_JWT_CLAIM_PREFIX;
+
+        if ($messagetype === 'LtiResourceLinkRequest') {
+            $claims = [
+                'iss' => '', // $CFG->wwwroot, to be added here.
+                'sub' => '', // Only applicable after authentication.
+                'aud' => '', // tool config's client id, to be added here.
+                'exp' => 1000,
+                'iat' => 1000,
+                'azp' => '',
+                'nonce' => '', // Only applicable after authentication because it's sent in the auth request.
+                'name' => '', // Only applicable after authentication.
+                'given_name' => '', // Only applicable after authentication.
+                'family_name' => '', // Only applicable after authentication.
+                'middle_name' => '', // Only applicable after authentication.
+                'picture' => '', // Only applicable after authentication.
+                'email' => '', // Only applicable after authentication.
+                'locale' => '', // Only applicable after authentication.
+                "$prefix/claim/deployment_id" => '',
+                "$prefix/claim/message_type" => 'LtiResourceLinkRequest',
+                "$prefix/claim/version" => '',
+                "$prefix/claim/roles" => [],
+                "$prefix/claim/role_scope_mentor" => [],
+                "$prefix/claim/context" => new stdClass(),
+                "$prefix/claim/resource_link" => new stdClass(),
+                "$prefix/claim/tool_platform" => new stdClass(),
+                "$prefix/claim/target_link_uri" => '',
+                "$prefix/claim/launch_presentation" => new stdClass(),
+                "$prefix/claim/lis" => new stdClass(),
+            ];
+
+            // TODO Add custom claims, including substitution params for the given tool and given resource link (tool takes priority if named the same).
+
+        } else {
+            // Other message types
+        }
+        return $claims;
     }
 
     /**

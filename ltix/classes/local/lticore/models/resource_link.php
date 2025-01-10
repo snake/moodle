@@ -135,4 +135,27 @@ final class resource_link extends persistent {
             ],
         ];
     }
+
+    public function to_lti_message(): lti_message {
+        return new lti_resource_link_request($this);
+    }
+
+    public static function get_by_legacy_id(int $legacyid): self {
+        $record = self::get_record(['legacyid' => $legacyid]);
+        return new self(record: $record);
+    }
+
+    public static function get_by_uuid(string $uuid): self {
+        $record = self::get_record(['uuid' => $uuid]);
+        return new self(record: $record);
+    }
+
+    /**
+     * Convenience helper for readability.
+     *
+     * @return bool
+     */
+    public function is_gradable(): bool {
+        return $this->gradable;
+    }
 }
