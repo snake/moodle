@@ -47,12 +47,13 @@ export default class ActivityContentItemSelection extends ContentItemSelection {
      *
      * @param {int} toolID The tool ID.
      * @param {int} contextID The context ID.
-     * @param {string|null} defaultTitle Default title to pass to the tool inside the deep_linking_settings claim..
-     * @param {string|null} defaultText Default text to pass to the tool inside the deep_linking_settings claim..
+     * @param {string} placementType The placement class information.
+     * @param {string|null} defaultTitle Default title to pass to the tool inside the deep_linking_settings claim.
+     * @param {string|null} defaultText Default text to pass to the tool inside the deep_linking_settings claim.
      * @returns {void}
      */
-    constructor(toolID, contextID, defaultTitle = null, defaultText = null) {
-        super(toolID, contextID, defaultTitle, defaultText);
+    constructor(toolID, contextID, placementType, defaultTitle = null, defaultText = null) {
+        super(toolID, contextID, placementType, defaultTitle, defaultText);
     }
 
     /**
