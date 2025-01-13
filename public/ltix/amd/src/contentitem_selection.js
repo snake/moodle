@@ -46,6 +46,9 @@ export default class ContentItemSelection {
     /** @property {int|null} contextID The context ID. */
     contextID = null;
 
+    /** @property {string|null} placementType The placement class information. */
+    placementType = null;
+
     /** @property {string|null} defaultTitle Default title to pass to the tool inside the deep_linking_settings claim. */
     defaultTitle = null;
 
@@ -60,12 +63,13 @@ export default class ContentItemSelection {
      *
      * @param {int} toolID The tool ID.
      * @param {int} contextID The context ID.
+     * @param {string} placementType The placement class information.
      * @param {string|null} defaultTitle Default title to pass to the tool inside the deep_linking_settings claim.
      * @param {string|null} defaultText Default text to pass to the tool inside the deep_linking_settings claim.
      * @returns {void}
      */
-    static async init(toolID, contextID, defaultTitle = null, defaultText = null) {
-        const contentItem = new this(toolID, contextID, defaultTitle, defaultText);
+    static async init(toolID, contextID, placementType, defaultTitle = null, defaultText = null) {
+        const contentItem = new this(toolID, contextID, placementType, defaultTitle, defaultText);
         contentItem.registerEventListeners();
     }
 
@@ -74,13 +78,15 @@ export default class ContentItemSelection {
      *
      * @param {int} toolID The tool ID.
      * @param {int} contextID The context ID.
+     * @param {string} placementType The placement class information.
      * @param {string|null} defaultTitle Default title to pass to the tool inside the deep_linking_settings claim.
      * @param {string|null} defaultText Default text to pass to the tool inside the deep_linking_settings claim.
      * @returns {void}
      */
-    constructor(toolID, contextID, defaultTitle = null, defaultText = null) {
+    constructor(toolID, contextID, placementType, defaultTitle = null, defaultText = null) {
         this.toolID = toolID;
         this.contextID = contextID;
+        this.placementType = placementType;
         this.defaultTitle = defaultTitle;
         this.defaultText = defaultText;
     }
@@ -143,6 +149,7 @@ export default class ContentItemSelection {
             postData: {
                 toolid: this.toolID,
                 contextid: this.contextID,
+                placementtype: this.placementType,
                 defaulttitle: this.defaultTitle,
                 defaulttext: this.defaultText
             }
