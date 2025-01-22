@@ -16,6 +16,8 @@
 
 namespace core;
 
+use core\tests\fake_plugins_test_trait;
+
 /**
  * Unit tests for (some of) ../moodlelib.php.
  *
@@ -26,6 +28,8 @@ namespace core;
  * @author     nicolas@moodle.com
  */
 final class moodlelib_test extends \advanced_testcase {
+
+    use fake_plugins_test_trait;
 
     /**
      * Define a local decimal separator.
