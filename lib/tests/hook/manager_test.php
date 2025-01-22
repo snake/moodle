@@ -17,6 +17,7 @@
 namespace core\hook;
 
 use core\di;
+use core\tests\fake_plugins_test_trait;
 
 /**
  * Hooks tests.
@@ -28,6 +29,9 @@ use core\di;
  * @covers \core\hook\manager
  */
 final class manager_test extends \advanced_testcase {
+
+    use fake_plugins_test_trait;
+
     /**
      * Test public factory method to get hook manager.
      */
