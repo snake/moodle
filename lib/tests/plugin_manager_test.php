@@ -17,6 +17,7 @@
 namespace core;
 
 use core\plugininfo\base;
+use core\tests\fake_plugins_test_trait;
 use core_plugin_manager;
 use testable_core_plugin_manager;
 use testable_plugininfo_base;
@@ -31,6 +32,8 @@ use testable_plugininfo_base;
  * @covers \core_plugin_manager
  */
 final class plugin_manager_test extends \advanced_testcase {
+
+    use fake_plugins_test_trait;
 
     public static function setUpBeforeClass(): void {
         global $CFG;
