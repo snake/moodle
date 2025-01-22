@@ -17,6 +17,7 @@
 namespace core;
 
 use core\exception\coding_exception;
+use core\tests\fake_plugins_test_trait;
 use DirectoryIterator;
 use ReflectionClass;
 use ReflectionProperty;
@@ -32,6 +33,9 @@ use ReflectionProperty;
  * @covers \core\component
  */
 final class component_test extends \advanced_testcase {
+
+    use fake_plugins_test_trait;
+
     #[\Override]
     public function tearDown(): void {
         parent::tearDown();
