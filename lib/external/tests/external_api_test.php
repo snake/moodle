@@ -16,6 +16,8 @@
 
 namespace core_external;
 
+use core\tests\fake_plugins_test_trait;
+
 /**
  * Unit tests for core_external\external_api.
  *
@@ -26,6 +28,9 @@ namespace core_external;
  * @covers      \core_external\external_api
  */
 final class external_api_test extends \advanced_testcase {
+
+    use fake_plugins_test_trait;
+
     /**
      * Test the validate_parameters method.
      *
