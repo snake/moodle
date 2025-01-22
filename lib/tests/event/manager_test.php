@@ -16,6 +16,8 @@
 
 namespace core\event;
 
+use core\tests\fake_plugins_test_trait;
+
 /**
  * Tests for the \core\event\manager class.
  *
@@ -26,6 +28,8 @@ namespace core\event;
  * @covers \core\event\manager
  */
 final class manager_test extends \advanced_testcase {
+
+    use fake_plugins_test_trait;
 
     /**
      * Test verifying that observers are not returned for deprecated plugin types.
