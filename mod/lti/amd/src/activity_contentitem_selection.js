@@ -16,12 +16,12 @@
 /**
  * Class that defines content item selection process for creating an LTI external tool activity.
  *
- * @module     mod_lti/activitycontentitem
+ * @module     mod_lti/activity_contentitem_selection
  * @copyright  2024 Mihail Geshoski <mihail@moodle.com>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
-import ContentItem from 'core_ltix/contentitem';
+import ContentItemSelection from 'core_ltix/contentitem_selection';
 import FormField from 'mod_lti/form-field';
 import Templates from 'core/templates';
 
@@ -40,19 +40,19 @@ const Selectors = {
     buttonGroup: '#fgroup_id_buttonar'
 };
 
-export default class ActivityContentItem extends ContentItem {
+export default class ActivityContentItemSelection extends ContentItemSelection {
 
     /**
      * The class constructor.
      *
      * @param {int} toolID The tool ID.
      * @param {int} contextID The context ID.
-     * @param {string|null} toolInstanceTitle The tool instance title.
-     * @param {string|null} toolInstanceText The tool instance text.
+     * @param {string|null} defaultTitle Default title to pass to the tool inside the deep_linking_settings claim..
+     * @param {string|null} defaultText Default text to pass to the tool inside the deep_linking_settings claim..
      * @returns {void}
      */
-    constructor(toolID, contextID, toolInstanceTitle = null, toolInstanceText = null) {
-        super(toolID, contextID, toolInstanceTitle, toolInstanceText);
+    constructor(toolID, contextID, defaultTitle = null, defaultText = null) {
+        super(toolID, contextID, defaultTitle, defaultText);
     }
 
     /**
@@ -71,8 +71,8 @@ export default class ActivityContentItem extends ContentItem {
      * @returns {void}
      */
     customContentItemTriggerActions() {
-        this.toolInstanceTitle = document.querySelector(Selectors.activityNameInput).value.trim();
-        this.toolInstanceText = document.querySelector(Selectors.activityDescriptionTextarea).value.trim();
+        this.defaultTitle = document.querySelector(Selectors.activityNameInput).value.trim();
+        this.defaultText = document.querySelector(Selectors.activityDescriptionTextarea).value.trim();
     }
 
     /**

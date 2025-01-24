@@ -518,7 +518,7 @@ class mod_lti_mod_form extends moodleform_mod {
         $this->add_action_buttons();
 
         if ($supportscontentitemselection) {
-            $PAGE->requires->js_call_amd('mod_lti/activitycontentitem', 'init',
+            $PAGE->requires->js_call_amd('mod_lti/activity_contentitem_selection', 'init',
                 [$tooltypeid, $this->context->id]);
         }
     }
