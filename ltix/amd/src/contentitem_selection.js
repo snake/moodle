@@ -16,7 +16,7 @@
 /**
  * Base class for defining a content item selection request to an LTI tool provider that supports Content-Item type messages.
  *
- * @module     core_ltix/contentitem
+ * @module     core_ltix/contentitem_selection
  * @copyright  2024 Mihail Geshoski <mihail@moodle.com>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  * @since      5.0
@@ -38,7 +38,7 @@ const Selectors = {
     mainContainer: 'div.contentitem-container'
 };
 
-export default class ContentItem {
+export default class ContentItemSelection {
 
     /** @property {int|null} toolID The tool ID. */
     toolID = null;
@@ -46,11 +46,11 @@ export default class ContentItem {
     /** @property {int|null} contextID The context ID. */
     contextID = null;
 
-    /** @property {string|null} toolInstanceTitle The tool instance title. */
-    toolInstanceTitle = null;
+    /** @property {string|null} defaultTitle Default title to pass to the tool inside the deep_linking_settings claim. */
+    defaultTitle = null;
 
-    /** @property {string|null} toolInstanceText The tool instance text. */
-    toolInstanceText = null;
+    /** @property {string|null} defaultText Default text to pass to the tool inside the deep_linking_settings claim. */
+    defaultText = null;
 
     /** @property {Object|null} modal The modal object. */
     modal = null;
@@ -60,12 +60,12 @@ export default class ContentItem {
      *
      * @param {int} toolID The tool ID.
      * @param {int} contextID The context ID.
-     * @param {string|null} toolInstanceTitle The tool instance title.
-     * @param {string|null} toolInstanceText The tool instance text.
+     * @param {string|null} defaultTitle Default title to pass to the tool inside the deep_linking_settings claim.
+     * @param {string|null} defaultText Default text to pass to the tool inside the deep_linking_settings claim.
      * @returns {void}
      */
-    static async init(toolID, contextID, toolInstanceTitle = null, toolInstanceText = null) {
-        const contentItem = new this(toolID, contextID, toolInstanceTitle, toolInstanceText);
+    static async init(toolID, contextID, defaultTitle = null, defaultText = null) {
+        const contentItem = new this(toolID, contextID, defaultTitle, defaultText);
         contentItem.registerEventListeners();
     }
 
@@ -74,15 +74,15 @@ export default class ContentItem {
      *
      * @param {int} toolID The tool ID.
      * @param {int} contextID The context ID.
-     * @param {string|null} toolInstanceTitle The tool instance title.
-     * @param {string|null} toolInstanceText The tool instance text.
+     * @param {string|null} defaultTitle Default title to pass to the tool inside the deep_linking_settings claim.
+     * @param {string|null} defaultText Default text to pass to the tool inside the deep_linking_settings claim.
      * @returns {void}
      */
-    constructor(toolID, contextID, toolInstanceTitle = null, toolInstanceText = null) {
+    constructor(toolID, contextID, defaultTitle = null, defaultText = null) {
         this.toolID = toolID;
         this.contextID = contextID;
-        this.toolInstanceTitle = toolInstanceTitle;
-        this.toolInstanceText = toolInstanceText;
+        this.defaultTitle = defaultTitle;
+        this.defaultText = defaultText;
     }
 
     /**
@@ -139,16 +139,16 @@ export default class ContentItem {
      */
     async renderModalBody() {
         var context = {
-            url: Url.relativeUrl('/ltix/contentitem.php'),
+            url: Url.relativeUrl('/ltix/contentitemselection.php'),
             postData: {
                 toolid: this.toolID,
                 contextid: this.contextID,
-                toolinstancetitle: this.toolInstanceTitle,
-                toolinstancetext: this.toolInstanceText
+                defaulttitle: this.defaultTitle,
+                defaulttext: this.defaultText
             }
         };
 
-        return Templates.render('core_ltix/contentitem', context);
+        return Templates.render('core_ltix/contentitem_selection', context);
     }
 
     /**

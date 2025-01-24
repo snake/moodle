@@ -15,7 +15,7 @@
     along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 }}
 {{!
-    @template core_ltix/contentitem
+    @template core_ltix/contentitem_selection
 
     Provides a template for the creation of a new external tool instance via the content-item message.
 
@@ -31,12 +31,12 @@
 
     Example context (json):
     {
-        "url": "contentitem.php",
+        "url": "contentitemselection.php",
         "postData": {
             "toolid": "1",
             "contextid": "1",
-            "toolinstancetitle": "Sample title",
-            "toolinstancetext": "This is a description"
+            "defaulttitle": "Default content item title",
+            "defaulttext": "Default content item description"
         }
     }
 
@@ -53,8 +53,8 @@
         <form target="contentitem-page-iframe" action="{{url}}" id="contentitem-request-form" method="post">
             <input type="hidden" name="id" value="{{postData.toolid}}" />
             <input type="hidden" name="contextid" value="{{postData.contextid}}" />
-            <input type="hidden" name="title" value="{{postData.toolinstancetitle}}" />
-            <input type="hidden" name="text" value="{{postData.toolinstancetext}}" />
+            <input type="hidden" name="title" value="{{postData.defaulttitle}}" />
+            <input type="hidden" name="text" value="{{postData.defaulttext}}" />
         </form>
     </div>
 </div>
