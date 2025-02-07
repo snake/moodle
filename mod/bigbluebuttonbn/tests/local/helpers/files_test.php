@@ -172,6 +172,23 @@ final class files_test extends \advanced_testcase {
         $this->assertEquals(self::PRESENTATION_FILENAME, $filename);
     }
 
+    public function test_pluginfile_filename_no_course_single_arg(): void {
+        global $CFG;
+        $this->resetAfterTest();
+
+        list($user, $bbactivity, $bbactivitycm, $bbactivitycontext) = $this->create_user_and_activity();
+        $this->setUser($user);
+        $this->create_sample_file(self::PRESENTATION_FILENAME, $bbactivitycontext->id);
+        $CFG->bigbluebuttonbn_preuploadpresentation_editable = true;
+        $presentationdef = files::get_presentation($bbactivitycontext, self::PRESENTATION_FILENAME, $bbactivity->id, true);
+        $pathparts = explode('/', $presentationdef['url']);
+        $filename = array_pop($pathparts);
+        $salt = array_pop($pathparts);
+        $filename = files::get_plugin_filename(null, $bbactivitycm->get_course_module_record(), $bbactivitycontext,
+            [$filename]);
+        $this->assertEquals(self::PRESENTATION_FILENAME, $filename);
+    }
+
     /**
      * Get media files
      */
