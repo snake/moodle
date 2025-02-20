@@ -1473,5 +1473,43 @@ function xmldb_main_upgrade($oldversion) {
         upgrade_main_savepoint(true, 2025013100.02);
     }
 
+    if ($oldversion < 2025013100.04) {
+        // If mod_lti is present, migrate the relevant link data to the replacement table in core_ltix.
+        // This needs to be done as a core step, so that this information is present when installing new services, some of which
+        // require re-linking to this data (e.g. ltixservice_gradebookservices).
+        if (file_exists($CFG->dirroot . '/mod/lti/version.php')) {
+            $table = new xmldb_table('lti_resource_link');
+
+            // Note: existing lti links can have typeid = null under the following circumstances:
+            // a) the link is a legacy, manually-configured instance.
+            // b) the link has been restored, cross-site, where the tool was not restored (site tools aren't).
+            // All lti records will have a corresponding lti_resource_link record created for them.
+            $sql = "INSERT INTO {lti_resource_link} (id, typeid, component, itemtype, itemid, contextid, url, title, text,
+                                 textformat, gradable, launchcontainer, customparams, icon, servicesalt)
+                         SELECT lti.id, lti.typeid, :component, :itemtype, cm.id, ctx.id, lti.toolurl, lti.name, lti.intro,
+                                lti.introformat, :gradable, lti.launchcontainer, lti.instructorcustomparameters, lti.icon,
+                                lti.servicesalt
+                           FROM {lti} lti
+                           JOIN {course_modules} cm ON (cm.instance = lti.id)
+                           JOIN {modules} m ON (m.id = cm.module)
+                           JOIN {context} ctx ON (ctx.instanceid = cm.id)
+                          WHERE m.name = :ltimodulename
+                            AND ctx.contextlevel = :contextlevel";
+            $DB->execute($sql, [
+                'component' => 'mod_lti',
+                'itemtype' => 'mod_lti:activityplacement', // The placement type. See mod/lti/db/lti.php where this is defined.
+                'gradable' => 1, // All links owned by mod_lti are deemed gradable since they are used in an activity placement.
+                'ltimodulename' => 'lti',
+                'contextlevel' => CONTEXT_MODULE,
+            ]);
+
+            // Reset table sequence for the id column.
+            $dbman->reset_sequence($table);
+        }
+
+        // Main savepoint reached.
+        upgrade_main_savepoint(true, 2025013100.04);
+    }
+
     return true;
 }
