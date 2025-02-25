@@ -56,6 +56,19 @@ class placements_helper {
     }
 
     /**
+     * Helper to get a component's deeplinking placement instance.
+     *
+     * @param string $placementtype the placement type string. e.g. 'mod_lti:activityplacement'.
+     * @return deeplinking_placement_handler
+     */
+    public static function get_deeplinking_placement_instance(string $placementtype): deeplinking_placement_handler {
+
+        $componentclassname = self::placement_class_from_placement_type($placementtype);
+
+        return $componentclassname::instance();
+    }
+
+    /**
      * Loads the lti placement types from disk for the given component.
      *
      * @param string $component the frankenstyle component name.
@@ -94,5 +107,25 @@ class placements_helper {
         foreach ($deletedplacementtypes as $deletedplacementtype) {
             $DB->delete_records('lti_placement_type', ['component' => $component, 'type' => $deletedplacementtype]);
         }
+    }
+
+    /**
+     * Helper to get a fully qualified class from a placement type string.
+     *
+     * @param string $placementtype the placement type, in the format COMPONENT:PLACEMENTNAME. e.g. 'mod_lti:activityplacement'.
+     * @return string the fully qualified classname of the component's placement class for the given placement type.
+     * @throws \coding_exception if an invalid placement type is given.
+     */
+    private static function placement_class_from_placement_type(string $placementtype): string {
+        global $DB;
+
+        // Syntax + type existence checks.
+        if (!preg_match('/^[a-z]+_[a-z_0-9]+:[a-z_0-9]+$/', $placementtype)) {
+            throw new \coding_exception("Invalid placement type. Should be of the form 'component:placementtypename'.");
+        }
+        $component = $DB->get_field('lti_placement_type', 'component', ['type' => $placementtype], MUST_EXIST);
+
+        $classname = explode(':', $placementtype)[1];
+        return "\\$component\\lti\\placement\\$classname";
     }
 }

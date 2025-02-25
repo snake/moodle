@@ -16,6 +16,8 @@
 
 namespace core_ltix\local\placement;
 
+use core\tests\fake_plugins_test_trait;
+
 /**
  * Placements helper tests.
  *
@@ -25,6 +27,8 @@ namespace core_ltix\local\placement;
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 final class placements_helper_test extends \advanced_testcase {
+
+    use fake_plugins_test_trait;
 
     /**
      * Test registration of component placement types during install/upgrade, via the update_placement_types() method.
@@ -64,5 +68,42 @@ final class placements_helper_test extends \advanced_testcase {
             ['component' => 'fake_fullfeatured', 'type' => 'fake_fullfeatured:thisonetobedeleted']));
         $this->assertEquals(0, $DB->count_records('lti_placement',
             ['toolid' => 101]));
+    }
+
+    /**
+     * Test fetching a deep linking placements component implementation.
+     *
+     * @return void
+     * @runInSeparateProcess
+     */
+    public function test_get_deeplinking_placement_handler(): void {
+        $this->resetAfterTest();
+        global $CFG;
+
+        // Deep mock a fake plugin with lti placement stubs.
+        $this->add_full_mocked_plugintype('fake', 'lib/tests/fixtures/fakeplugins/fake');
+        $this->add_mocked_plugin('fake', 'fullfeatured', "{$CFG->dirroot}/lib/tests/fixtures/fakeplugins/fake/fullfeatured");
+        placements_helper::update_placement_types('fake_fullfeatured');
+
+        // Expect an instance of deeplinking_placement_handler.
+        $placementinstance = placements_helper::get_deeplinking_placement_instance('fake_fullfeatured:myfirstplacementtype');
+        $this->assertInstanceOf(\core_ltix\local\placement\deeplinking_placement_handler::class, $placementinstance);
+        $this->assertEquals('fake_fullfeatured\lti\placement\myfirstplacementtype', get_class($placementinstance));
+
+        // Verify an exception is thrown when an invalid placement type string is used.
+        try {
+            placements_helper::get_deeplinking_placement_instance('fake_fullfeatured:THIS:ISINVALID');
+            $this->fail('Exception expected for invalid placement type string.');
+        } catch (\coding_exception $e) {
+            $this->assertMatchesRegularExpression('/.*Invalid placement type.*/', $e->getMessage());
+        }
+
+        // Verify an exception is thrown when an implementation of deeplinking_placement cannot be found.
+        try {
+            placements_helper::get_deeplinking_placement_instance('fake_fullfeatured:not_a_class_name');
+            $this->fail('Exception expected when placement is not implemented.');
+        } catch (\dml_exception $e) {
+            $this->assertEquals('invalidrecord', $e->errorcode);
+        }
     }
 }
