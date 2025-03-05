@@ -16,6 +16,8 @@
 
 namespace core_ltix\local\placement;
 
+use core_ltix\constants;
+
 /**
  * LTI Placements manager.
  *
@@ -75,6 +77,140 @@ final class placements_manager {
         self::placement_types_cleanup($component, $deletedplacementtypes);
 
         \cache::make('core', 'ltix_placementtype_handlers')->delete('handlers');
+    }
+
+    /**
+     * Get all placements for a given tool id.
+     *
+     * @param int $toolid the tool id.
+     * @return array the array of placements, empty if none exist.
+     */
+    public static function get_tool_placements(int $toolid): array {
+        global $DB;
+
+        $placementsql = <<<EOF
+            SELECT p.id AS id, tool.id AS toolid, pt.type AS placementtype
+              FROM {lti_types} tool
+              JOIN {lti_placement} p ON (p.toolid = tool.id)
+              JOIN {lti_placement_type} pt ON (pt.id = p.placementtypeid)
+             WHERE tool.id = :toolid
+        EOF;
+        $placements = $DB->get_records_sql($placementsql, ['toolid' => $toolid]);
+
+        // Init empty config. It is populated from DB below.
+        array_map(function ($placement) {
+            $placement->config = [];
+        }, $placements);
+
+        $placementsconfigsql = <<<EOF
+                SELECT p.id AS placementid, pc.id AS configid, pc.name AS name, pc.value AS value
+                  FROM {lti_types} tool
+                  JOIN {lti_placement} p ON (p.toolid = tool.id)
+                  JOIN {lti_placement_config} pc ON (pc.placementid = p.id)
+                 WHERE tool.id = :toolid
+              ORDER BY tool.id
+            EOF;
+        $placementsconfigrs = $DB->get_recordset_sql($placementsconfigsql, ['toolid' => $toolid]);
+        foreach ($placementsconfigrs as $record) {
+            $placements[$record->placementid]->config[$record->name] = $record->value;
+        }
+        $placementsconfigrs->close();
+
+        return $placements;
+    }
+
+    /**
+     * Get the status of a tool placement in a context.
+     *
+     * @param int $placementid
+     * @param int $contextid
+     * @return placement_status
+     */
+    public static function get_placement_status(int $placementid, int $contextid): placement_status {
+        global $DB;
+
+        $sql = <<<EOF
+            SELECT p.id, pc.value AS defaultusage, ps.status as placementstatus
+              FROM {lti_placement} p
+         LEFT JOIN {lti_placement_config} pc ON (pc.placementid = p.id AND pc.name = :defaultusageconfigname)
+         LEFT JOIN {lti_placement_status} ps ON (ps.placementid = p.id AND ps.contextid = :contextid)
+             WHERE p.id = :placementid
+        EOF;
+        $params = [
+            'placementid' => $placementid,
+            'defaultusageconfigname' => 'default_usage',
+            'contextid' => $contextid,
+        ];
+        $result = $DB->get_record_sql($sql, $params, MUST_EXIST);
+
+        // TODO: should the above exclude the placement statuses for hidden tools to bring it in line with
+        //  get_enabled_placements_of_type_in_context?
+
+        // Placement status is resolved in the following way (and order):
+        // If defaultusage is null, throw exception, bad data (default is expected to exist).
+        // If defaultusage is set but no placement_status record exists: use defaultusage.
+        // If defaultusage is set and placement_status DOES exist: use placement_status.
+        if (is_null($result->defaultusage)) {
+            throw new \coding_exception("Bad placement config data. Missing config with name 'default_usage' ".
+                "(supported values: enabled, disabled).");
+        } else if ($result->defaultusage && is_null($result->placementstatus)) {
+            $placementstatus = $result->defaultusage == "enabled" ? placement_status::ENABLED : placement_status::DISABLED;
+        } else {
+            $placementstatus = $result->placementstatus == 1 ? placement_status::ENABLED : placement_status::DISABLED;
+        }
+
+        return $placementstatus;
+    }
+
+    /**
+     * Get a list of enabled placement types in a context.
+     *
+     * Omits placements for tools not available to the context (e.g. excludes placements for hidden tools).
+     *
+     * @param string $placementtype the placement type string
+     * @param int $contextid the context id
+     * @return array the list of placements
+     * @throws \coding_exception if the placement type is invalid.
+     */
+    public static function get_enabled_placements_of_type_in_context(string $placementtype, int $contextid): array {
+        global $DB;
+
+        if (!self::is_valid_placement_type_string($placementtype)) {
+            throw new \coding_exception("Invalid placement type. Should be of the form 'component:placementtypename'.");
+        }
+
+        [$visiblesql, $visibleparams] = $DB->get_in_or_equal(
+            [constants::LTI_COURSEVISIBLE_PRECONFIGURED, constants::LTI_COURSEVISIBLE_ACTIVITYCHOOSER],
+            SQL_PARAMS_NAMED
+        );
+
+        $sql = <<<EOF
+            SELECT tool.id, pc.value AS defaultusage, ps.status as placementstatus
+              FROM {lti_placement_type} pt
+              JOIN {lti_placement} p ON (pt.id = p.placementtypeid)
+              JOIN {lti_types} tool ON (tool.id = p.toolid)
+         LEFT JOIN {lti_placement_config} pc ON (pc.placementid = p.id AND pc.name = :defaultusageconfigname)
+         LEFT JOIN {lti_placement_status} ps ON (ps.placementid = p.id AND ps.contextid = :contextid)
+             WHERE pt.type = :placementtype
+               AND tool.coursevisible $visiblesql
+        EOF;
+        $params = [
+            'placementtype' => $placementtype,
+            'defaultusageconfigname' => 'default_usage',
+            'contextid' => $contextid,
+        ] + $visibleparams;
+        $results = $DB->get_records_sql($sql, $params);
+
+        return array_filter($results, function ($result) {
+            if (is_null($result->defaultusage)) {
+                throw new \coding_exception("Bad placement config data. Missing config with name 'default_usage' " .
+                    "(supported values: enabled, disabled).");
+            } else if ($result->defaultusage && is_null($result->placementstatus)) {
+                return $result->defaultusage == "enabled";
+            } else {
+                return $result->placementstatus == 1;
+            }
+        });
     }
 
     /**
