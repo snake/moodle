@@ -28,7 +28,6 @@ use core_ltix\local\ltiopenid\registration_helper;
 use core_ltix\local\ltiopenid\registration_exception;
 
 require_once(__DIR__ . '/../config.php');
-require_once(__DIR__ . '/constants.php');
 require_once(__DIR__ . '/OAuth.php'); // Required, since autoloading won't work for this collection of classes.
 
 $code = 200;
