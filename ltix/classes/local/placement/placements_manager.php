@@ -147,13 +147,17 @@ final class placements_manager {
     }
 
     /**
-     * Validate a placement type string follows the COMPONENTNAME:PLACEMENTNAME syntax.
+     * Validate a placement type string follows the COMPONENTNAME:PLACEMENTNAME syntax and contains a valid component.
      *
      * @param string $placementtype the placement type string.
      * @return bool true if valid, false otherwise.
      */
-    private static function is_valid_placement_type_string(string $placementtype): bool {
-        return preg_match('/^[a-z]+_[a-z_0-9]+:[a-z_0-9]+$/', $placementtype);
+    public static function is_valid_placement_type_string(string $placementtype): bool {
+        $bits = array_filter(preg_split('/[:]/', $placementtype));
+        if (count($bits) != 2) {
+            return false;
+        }
+        return in_array($bits[0], \core_component::get_component_names(includecore: true));
     }
 
     /**

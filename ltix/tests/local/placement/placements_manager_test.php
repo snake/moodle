@@ -119,4 +119,49 @@ final class placements_manager_test extends \advanced_testcase {
             $this->assertEquals('codingerror', $e->errorcode);
         }
     }
+
+    /**
+     * Test the placementtype string validation.
+     *
+     * @dataProvider placement_string_provider
+     * @param string $placementtype the placementtype string to check
+     * @param bool $expected whether the result is expected to be valid or not.
+     * @return void
+     */
+    public function test_is_valid_placement_type_string(string $placementtype, bool $expected): void {
+        $this->assertEquals($expected, placements_manager::is_valid_placement_type_string($placementtype));
+    }
+
+    /**
+     * Provider for testing is_valid_placement_type_string().
+     * @return array
+     */
+    public static function placement_string_provider(): array {
+        return [
+            'valid placement type' => [
+                'placementtype' => 'core_ltix:cat',
+                'expected' => true
+            ],
+            'valid placement type' => [
+                'placementtype' => 'core:cat',
+                'expected' => true
+            ],
+            'invalid example 1' => [
+                'placementtype' => 'core_ltix',
+                'expected' => false
+            ],
+            'invalid example 2' => [
+                'placementtype' => 'x_z:y',
+                'expected' => false
+            ],
+            'invalid example 3' => [
+                'placementtype' => 'core_ltix:',
+                'expected' => false
+            ],
+            'invalid example 4' => [
+                'placementtype' => 'core_ltix/cat',
+                'expected' => false
+            ]
+        ];
+    }
 }
