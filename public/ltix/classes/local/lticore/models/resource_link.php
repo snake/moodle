@@ -58,20 +58,9 @@ final class resource_link extends persistent {
                 'type' => PARAM_TEXT,
             ],
             'text' => [
-                'type' => PARAM_CLEANHTML,
+                'type' => PARAM_TEXT,
                 'default' => null,
                 'null' => NULL_ALLOWED,
-            ],
-            'textformat' => [
-                'type' => PARAM_INT,
-                'default' => FORMAT_MOODLE,
-                'null' => NULL_ALLOWED,
-                'choices' => [
-                    FORMAT_MOODLE,
-                    FORMAT_HTML,
-                    FORMAT_PLAIN,
-                    FORMAT_MARKDOWN,
-                ],
             ],
             'gradable' => [
                 'type' => PARAM_BOOL,

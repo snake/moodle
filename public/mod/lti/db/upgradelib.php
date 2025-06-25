@@ -197,13 +197,12 @@ class lti_migration_upgrade_helper {
         // a) If the link is a legacy, manually-configured instance, typeid = 0.
         // b) if the link has been restored, cross-site, where the tool was not restored (site tools aren't), typeid = null.
         // All links created here will map BOTH nulls and 0s to 0, denoting a link that isn't directly associated with a tool.
-        $sql = "INSERT INTO {lti_resource_link} (id, typeid, component, itemtype, itemid, contextid, url, title, text,
-                             textformat, gradable, launchcontainer, customparams, icon, servicesalt)
+        $sql = "INSERT INTO {lti_resource_link} (id, typeid, component, itemtype, itemid, contextid, url, title, gradable,
+                            launchcontainer, customparams, icon, servicesalt)
                      SELECT lti.id,
                             (CASE WHEN lti.typeid IS NULL THEN 0 ELSE lti.typeid END) AS typeid,
-                            :component, :itemtype, cm.id, ctx.id, lti.toolurl, lti.name, lti.intro,
-                            lti.introformat, :gradable, lti.launchcontainer, lti.instructorcustomparameters, lti.icon,
-                            lti.servicesalt
+                            :component, :itemtype, cm.id, ctx.id, lti.toolurl, lti.name, :gradable, lti.launchcontainer,
+                            lti.instructorcustomparameters, lti.icon, lti.servicesalt
                        FROM {lti} lti
                        JOIN {course_modules} cm ON (cm.instance = lti.id)
                        JOIN {modules} m ON (m.id = cm.module)

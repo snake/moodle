@@ -2044,8 +2044,7 @@ function xmldb_main_upgrade($oldversion) {
         $table->add_field('contextid', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, null);
         $table->add_field('url', XMLDB_TYPE_TEXT, null, null, XMLDB_NOTNULL, null, null);
         $table->add_field('title', XMLDB_TYPE_CHAR, '255', null, XMLDB_NOTNULL, null, null);
-        $table->add_field('text', XMLDB_TYPE_TEXT, null, null, null, null, null);
-        $table->add_field('textformat', XMLDB_TYPE_INTEGER, '4', null, null, null, '0');
+        $table->add_field('text', XMLDB_TYPE_CHAR, '1333', null, null, null, null);
         $table->add_field('gradable', XMLDB_TYPE_INTEGER, '1', null, XMLDB_NOTNULL, null, '0');
         $table->add_field('launchcontainer', XMLDB_TYPE_INTEGER, '2', null, XMLDB_NOTNULL, null, '1');
         $table->add_field('customparams', XMLDB_TYPE_TEXT, null, null, null, null, null);

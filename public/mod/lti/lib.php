@@ -140,8 +140,7 @@ function lti_add_instance($lti, $mform) {
         'contextid' => \core\context\module::instance($lti->coursemodule)->id,
         'url' => $lti->toolurl,
         'title' => $lti->name,
-        'text' => $lti->intro,
-        'textformat' => $lti->introformat,
+        'text' => '', // TODO: MDL-86033 set link text during launch, not during save.
         'gradable' => $lti->instructorchoiceacceptgrades,
         'servicesalt' => $lti->servicesalt,
         ...(isset($lti->launchcontainer) ? ['launchcontainer' => $lti->launchcontainer] : []),
@@ -219,8 +218,7 @@ function lti_update_instance($lti, $mform) {
         'contextid' => \core\context\module::instance($lti->coursemodule)->id,
         'url' => $lti->toolurl,
         'title' => $lti->name,
-        'text' => $lti->intro,
-        'textformat' => $lti->introformat,
+        'text' => '', // TODO: MDL-86033 set link text during launch, not during save.
         'gradable' => $lti->instructorchoiceacceptgrades,
         ...(!isset($lti->launchcontainer) ? ['launchcontainer' => $lti->launchcontainer] : []),
         ...(!empty($lti->icon) ? ['icon' => $lti->icon] : []),
