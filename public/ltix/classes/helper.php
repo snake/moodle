@@ -24,6 +24,7 @@ use core_ltix\local\lticore\message\payload\lti_1px_payload_converter;
 use core_ltix\local\lticore\repository\tool_registration_repository;
 use core_ltix\local\ltiopenid\lti_oidc_authenticator;
 use core_ltix\local\ltiopenid\lti_user_authenticator;
+use core_ltix\local\lticore\models\resource_link;
 use core_ltix\local\ltiopenid\registration_helper;
 use core_ltix\local\ltiopenid\jwks_helper;
 use core_ltix\local\ltiservice\service_helper;
@@ -3059,6 +3060,108 @@ class helper {
         return join(',', $roles);
     }
 
+    // TODO should replace get_ims_role and be named better. MUST return v2 vocal roles in their resolved form, not requiring translating.
+    //  Furthermore, since this is called by both launch code AND memberships service (where that code passes the islti2=true param),
+    //  any replacement will need to be a drop in replacement, ideally.
+    public static function get_launch_roles(int $userid, \core\context $context): array {
+        $roles = [];
+
+        // TODO: remove this once confirming it's 100% not needed.
+        //  the reasoning: we can check moodle/ltix:manage at either course or module context, so why bother checking something else.
+//        if (empty($cmid)) {
+//            // If no cmid is passed, check if the user is a teacher in the course
+//            // This allows other modules to programmatically "fake" a launch without
+//            // a real LTI instance.
+//            $context = \context_course::instance($courseid);
+//
+//            if (has_capability('moodle/course:manageactivities', $context, $userid)) {
+//                array_push($roles, 'Instructor');
+//            } else {
+//                array_push($roles, 'Learner');
+//            }
+//        } else {
+
+        if (has_capability('moodle/ltix:manage', $context)) {
+            array_push($roles, 'Instructor');
+        } else {
+            array_push($roles, 'Learner');
+        }
+
+        $coursecontext = $context->get_course_context(strict: false);
+        if ($coursecontext) {
+            $courseid = $coursecontext->instanceid;
+            if (!is_role_switched($courseid) && (is_siteadmin($userid)) || has_capability('moodle/ltix:admin', $context)) {
+                // Make sure admins do not have the Learner role, then set admin role.
+                $roles = array_diff($roles, array('Learner'));
+
+                // TODO We may be able to just return the legacy role and convert it for LTI 2.0 use using lis_vocab_converter?
+                array_push($roles, 'urn:lti:sysrole:ims/lis/Administrator', 'urn:lti:instrole:ims/lis/Administrator');
+            }
+        } else {
+            // If we cannot resolve a course context, then role switching isn't a concern.
+        }
+        return $roles;
+    }
+
+    /**
+     * A context-based IMS role assignment helper for LTI 1.3 ONLY. This is not compatible with legacy roles.
+     *
+     * The logic here is based on the legacy role calc code in {@see self::get_ims_role()} and {@see oauth_helper::sign_jwt()}.
+     *
+     * @param int $userid
+     * @param \core\context $context
+     * @return array
+     * @throws coding_exception
+     */
+    public static function get_lti_message_roles(int $userid, \core\context $context): array {
+        $roles = [];
+
+        // moodle/ltix:manage can be granted at mod level.
+        // TODO: create a tracker to address the capability migration stuff.
+        //  Do we want launch to be handled at mod-level as the 'usual' context? Probably not. Probably better as course.
+
+        // Note: Previously, cmid would be present in resource link launch.
+        // Cmid would be omitted if doing a deep linking launch, where no cmid existed yet.
+        if (has_capability('moodle/ltix:manage', $context, $userid)) {
+            array_push($roles, 'Instructor');
+        } else {
+            array_push($roles, 'Learner');
+        }
+
+        if (has_capability('moodle/ltix:admin', $context, $userid)) {
+            // Explicitly defined admins: drop the learner role and always granted IMS admin role.
+            $roles = array_diff($roles, array('Learner'));
+            array_push($roles, 'urn:lti:sysrole:ims/lis/Administrator', 'urn:lti:instrole:ims/lis/Administrator');
+        } else if (is_siteadmin($userid)) {
+            // De-facto admins (is an admin in Moodle): drop the learner role and conditionally grant IMS admin role.
+            // Here, an additional check is required in course-specific contexts to support the 'loginas' feature.
+            // If not in a course-related context, the IMS roles is always added.
+            $roles = array_diff($roles, array('Learner'));
+            $coursecontext = $context->get_course_context(false); // Note: returns false if course context not applicable.
+            if (($coursecontext && !is_role_switched($coursecontext->instanceid)) || !$coursecontext) {
+                array_push($roles, 'urn:lti:sysrole:ims/lis/Administrator', 'urn:lti:instrole:ims/lis/Administrator');
+            }
+        }
+
+        // Convert shortnames to correct full name + fix legacy role names.
+        // TODO This should use the vocab converter if we choose to keep this method.
+        $finalroles = [];
+        foreach ($roles as $role) {
+            if (strpos($role, 'urn:lti:role:ims/lis/') === 0) {
+                $role = 'http://purl.imsglobal.org/vocab/lis/v2/membership#' . substr($role, 21);
+            } else if (strpos($role, 'urn:lti:instrole:ims/lis/') === 0) {
+                $role = 'http://purl.imsglobal.org/vocab/lis/v2/institution/person#' . substr($role, 25);
+            } else if (strpos($role, 'urn:lti:sysrole:ims/lis/') === 0) {
+                $role = 'http://purl.imsglobal.org/vocab/lis/v2/system/person#' . substr($role, 24);
+            } else if ((strpos($role, '://') === false) && (strpos($role, 'urn:') !== 0)) {
+                $role = "http://purl.imsglobal.org/vocab/lis/v2/membership#{$role}";
+            }
+            $finalroles[] = $role;
+        }
+
+        return $finalroles;
+    }
+
     public static function get_shared_secrets_by_key($key) {
         global $DB;
 
@@ -4212,4 +4315,33 @@ class helper {
 
     }
 
+    /**
+     * Try to get the associated tool configuration for the given resource link.
+     *
+     * The resource link will usually be directly associated with a tool configuration, however, in cross-site backup and restore
+     * scenarios, resource links become detached as tool configuration isn't copied to the destination site. As such we also try
+     * to domain match tool configuration here.
+     *
+     * TODO: move this code into a tool configuration repository.
+     *
+     * @param resource_link $link a resource link instance.
+     * @return stdClass|null tool configuration, if found, else null.
+     */
+    public static function get_tool_config_for_link(resource_link $link): ?\stdClass {
+        if ($link->get('typeid') !== 0) {
+            // TODO: this next call can except, but we may wish to just return null in such a case, letting call code decide
+            //  whether that needs an exception or not.
+            return helper::get_type_type_config($link->get('typeid'));
+        } else {
+            $linktarget = $link->get('url');
+            if (empty($linktarget)) {
+                return null; // No link URL, cannot domain match to tool.
+            }
+            $tool = \core_ltix\helper::get_tool_by_url_match($linktarget);
+            if (empty($tool)) {
+                return null;
+            }
+            return helper::get_type_type_config($tool->id);
+        }
+    }
 }
