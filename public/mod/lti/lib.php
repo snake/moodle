@@ -124,6 +124,9 @@ function lti_add_instance($lti, $mform) {
         lti_grade_item_update($lti);
     }
 
+    // TODO: this should be replaced with a core_ltix call, effectively notifying core_ltix
+    //  that a gradable link has been created and allowing core_ltix to call into services alerting them
+    //  and allowing them to update things, if necessary.
     $services = \core_ltix\helper::get_services();
     foreach ($services as $service) {
         $service->instance_added( $lti );
@@ -417,6 +420,21 @@ function lti_get_coursemodule_info($coursemodule) {
         $info->content = format_module_intro('lti', $lti, $coursemodule->id, false);
     }
 
+    // TODO: mod_lti takes the responsibility of handling the manually configured instances. core_ltix can't handle these.
+    //  Only mod_lti knows where the config is for these (i.e. in the lti instance table).
+    //  The following code will need to be replaced with something like:
+    //  $link = \core_ltix\placements_helper::get_link_for_placement('mod_lti:activityplacement', $coursemodule->instance);
+    //  $toolconfig = \core_ltix\helper::get_tool_config_for_link($link);
+    //  This wraps directly-linked tool config, domain matched config + any other config logic.
+    //  Then, we'd be able to do something like:
+    //  if ($toolconfig && $toolconfig->launchcontainer == WINDOW) {
+    //      we have config, so can just check the launch container and add the onclick handler
+    //  else if (is_null($toolconfig)) {
+    //      Tool config could not be found for the link.
+    //      this could be any link restored cross-site, without a matched tool, or could be a manually configured lti1p1 link.
+    //      we might be forced to make a best guess at this stage...checking perhaps lti->password etc..
+    //      if we're sure it's a manual instance, we can check the launchcontainer there, otherwise need to assume defaults...
+    //  }
     if (!empty($lti->typeid)) {
         $toolconfig = \core_ltix\helper::get_type_config($lti->typeid);
     } else if ($tool = \core_ltix\helper::get_tool_by_url_match($lti->toolurl)) {

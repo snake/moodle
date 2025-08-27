@@ -60,13 +60,52 @@ $forceview = optional_param('forceview', 0, PARAM_BOOL);
 if ($l) {  // Two ways to specify the module.
     $lti = $DB->get_record('lti', array('id' => $l), '*', MUST_EXIST);
     $cm = get_coursemodule_from_instance('lti', $lti->id, $lti->course, false, MUST_EXIST);
-
 } else {
     $cm = get_coursemodule_from_id('lti', $id, 0, false, MUST_EXIST);
     $lti = $DB->get_record('lti', array('id' => $cm->instance), '*', MUST_EXIST);
 }
-
 $course = $DB->get_record('course', array('id' => $cm->course), '*', MUST_EXIST);
+
+
+// TODO: view currently handles a number of things:
+//  - all presentation modes (embed, new window, etc).
+//  - new window launches (will force you to launch in a new window if you hit view.php directly)
+//  - domain matching tools (for restored instances which are not tied directly to tools any more)
+//  - manually configured instances (legacy) where no typeid present.
+//  - crudely handles submission review concerns
+//  Now that we have resource_links:
+//  - fetch the link, see if it's mapped to a type. If so, launch.
+//  - Else, we still have domain matching to consider, since bnr can leave orphaned links.
+//  - manually configured instances (MCI) _should_ be covered by the above 2 points; it still comes down to launching a link, however,
+//    for a manually configured instance, there IS no tool (that data is on the lti record), so we do need code to handle that case.
+
+// TODO In terms of launch container stuff:
+//  - we should defer to the tool, or the MCI.
+//  - should the iframe be generated herein? that might be a later concern. perhaps there's a use case for sending back the iframe
+//   html from core_ltix if callers want to embed, letting callers control the rest of their page and just dumping the iframe into
+//  it. Likewise, if it's a new window launch, we probably want core_ltix to give us back a link to launch it.
+//  So, some basic understanding is required by the client code to juggle these...How can THAT be improved?
+//  - existing window: replaces everything in current window: redirect to core_ltix launch.
+//  - new window: should open a tab: either open a new window, or present a link to new window.
+//  - embed x2: sets pagelayout in current page + embeds - the issue here is current page....
+//  Maybe we can provide a page-centric launch helper in core_ltix, as well as a link-centric one (if you want to get a link).
+//  e.g. if you're ON a page, or in client code somewhere, you likely need the same kind of handling as mod_lti does.
+//  \core_ltix\launch_presentation_helper::page_launch($link);
+//  This would consolidate that pagelayout code into core_ltix, and could return HTML for the case where we're expecting a new window
+//  launch which cannot be done in-page. Clients could just go:
+//  $launchhtml = \core_ltix\launch_helper::launch_link($link); // This might redirect for existing window launch.
+//  if ($launchhtml) {
+//      // Put the launch html somewhere in the client page.
+//      // it'll either return iframe HTML for the client to output or HTML supporting a fallback for "open in new window".
+//      // Client code will ideally control the new window case with a link to launch the thing elsewhere...
+//  }
+//  Take course nav as another little example of the problem:
+//  at render time (in the course navigation callback), the client code will ideally KNOW the launch type supported by each link,
+//  so that it can create links the right way to launch the resource. Either:
+//  - a link with target="_blank" set to use core_ltix launch endpoint in new window.
+//  - a link to core_ltix launch endpoint, which will just launch in the existing window when followed.
+//  - a link to some intermediary page which WOULD support embedding (the above 2 don't), but this page needs a context + defaults.
+//  This is an example where we very likely want to let core_ltix handle everything and just need the relevant link back.
 
 $typeid = $lti->typeid;
 if (empty($typeid) && ($tool = \core_ltix\helper::get_tool_by_url_match($lti->toolurl))) {
@@ -142,7 +181,22 @@ if ($typeid) {
     $config = new stdClass();
     $config->lti_ltiversion = \core_ltix\constants::LTI_VERSION_1;
 }
-$launchurl = new moodle_url('/mod/lti/launch.php', ['id' => $cm->id, 'triggerview' => 0]);
+//$launchurl = new moodle_url('/mod/lti/launch.php', ['id' => $cm->id, 'triggerview' => 0]);
+
+// TODO: Here, we'll need fetch the tool's (and in future, maybe link's) launch presentation and use that.
+
+
+// TODO: delegate the launch to ltix/launch.php.
+$link = \core_ltix\local\lticore\models\resource_link::get_record([
+    'component' => 'mod_lti',
+    'itemtype' => 'mod_lti:activityplacement',
+    'itemid' => $cm->id,
+    'contextid' => $context->id
+]);
+// TODO: throw error if there is no link...really shouldn't happen.
+$launchurl = new moodle_url('/ltix/launch.php', ['id' => $link->get('id')]);
+
+
 if ($action) {
     $launchurl->param('action', $action);;
 }

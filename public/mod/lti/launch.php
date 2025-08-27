@@ -58,6 +58,62 @@ $foruserid = optional_param('user', 0, PARAM_INT);
 $cm = get_coursemodule_from_id('lti', $cmid, 0, false, MUST_EXIST);
 $lti = $DB->get_record('lti', array('id' => $cm->instance), '*', MUST_EXIST);
 
+// TODO: Launch workflow overview (implement this):
+//  1. get the link, where itemtype='mod_lti:activityplacement', itemid=$cm->instance.
+//  2. Find the tool associated with the link:
+//  a) it might be set on the link directly (1p3/2p0 mostly, outside of backup and restore scenarios,
+//   1p1 sometimes as can be manually configured via legacy feature)
+//  b) if not set on the link, then try to domain match (won't find manually configure 1p1 instances though).
+//  3. At this stage, there's no guarantee we have a tool, however, we likely do.
+//  for the 1p1 manually configured instance case, we can probably fudge the necessary tool info from the instance table....
+//  Then:
+//  4. a) if 1p3, use the launch builder. we must have a tool by now for 1p3.
+//     b) if 1p1 ( if we have a tool) or 2p0...
+//     c) for 1p1 where we don't...
+// ---------
+// legacy_launch_link($link); for 1p1/2p0 and
+// builders for 1p3?
+// Pseudocode:
+// $link = core_ltix\helper::get_placement_link(...);
+// $toolconfig = helper::get_tool_config_from_link(); //also does domain matching based on link URL.
+// if (!$toolconfig) {
+//     special case for manually-configured 1p1 instances.
+//     launch_tool_replacement()
+// } else {
+//     if 1p1/2p0
+//         launch_tool_replacement()
+//     if 1p3
+//         $builder = new lti_resource_link_launch_request_builder();
+//         $builder->build_resource_link_launch_request($toolconfig, $link, $servicefacade, $issuer, $USER);
+// }
+// This is complex, however, this launch endpoint is very likely located in a core_ltix view.
+// But what does that look like? How are consumers presenting their links in content, for example?
+// Some ideas for link presentation:
+// In general, at the most basic level (matching current mod_lti behaviours):
+// - embedded: the component decides where the embedding takes place. API to embed the frame and delegate the launch to core.
+//   the component can choose to surface the lti links for launch really anywhere.
+// - new window: components need to surface a link directly to ltix/launch.php?blah
+//
+// the core endpoint might be ltix/launch.php, which just takes id of the link.
+//
+// Problem: how does a placement KNOW what the tool settings are for a given link, in order to make decisions like whether to link
+// to ltix/launch.php, or whether to embed it?
+// A: We're going to need an API for this...
+// something like:
+//
+// this can check in the following way:
+// 1. tool associated with the link (first check, most links)
+// 2. if no associated tool config, try to domain match a tool (handles bnr)
+// 3. else no tool config found
+//
+// For mod_lti, we'd need to check this, and then add additional logic supporting those legacy, manually configured instances, since
+// the tool data resides inside the lti table in this case:
+// if (helper::get_tool_config_from_link($link) === null)) {
+//     try to read the launch container from the lti table and make inferences from that.
+// }
+// So ltix/launch.php can be ugly, but it can't depend on lti instances!
+// Options with minimal change for 1p1/2p0:
+// Can we provide an adaptor allowing the core_ltix link launch to work with lti legacy?
 $typeid = $lti->typeid;
 if (empty($typeid) && ($tool = \core_ltix\helper::get_tool_by_url_match($lti->toolurl))) {
     $typeid = $tool->id;
