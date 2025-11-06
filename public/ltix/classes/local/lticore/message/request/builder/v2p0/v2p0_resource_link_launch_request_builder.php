@@ -65,7 +65,12 @@ class v2p0_resource_link_launch_request_builder extends v2p0_launch_request_buil
      * @return array the array of claims.
      */
     protected function create_required_request_params(): array {
-        $description = $this->resourcelink->get('text');
+        $description = format_text($this->resourcelink->get('text'), $this->resourcelink->get('textformat'));
+        $description = trim(html_to_text($description, 0, false));
+        // This may look weird, but this is required for new lines
+        // so we generate the same OAuth signature as the tool provider.
+        $intro = str_replace("\n", "\r\n", $description);
+
         return [
             'resource_link_id' => $this->resourcelink->get('id'),
             'resource_link_title' => $this->resourcelink->get('title'),

@@ -273,6 +273,7 @@ class v2p0_resource_link_launch_request_builder_test extends \basic_testcase {
                     ]
                 ],
             ],
+            // TODO: case testing link description formatting.
         ];
     }
 }

@@ -18,7 +18,7 @@ class resource_link_launch_service_facade implements launch_service_facade_inter
 
     public function __construct(
         protected \stdClass $toolconfig,
-        protected \core\context $context,
+        protected \stdClass $course,
         protected int $userid,
         protected resource_link $resourcelink,
     ) {
@@ -36,7 +36,7 @@ class resource_link_launch_service_facade implements launch_service_facade_inter
                 toolconfig: $this->toolconfig,
                 messagetype: $this->messagetype,
                 targetlinkuri: $targetlinkuri,
-                context: $this->context,
+                course: $this->course,
                 userid: $this->userid,
                 resourcelink: $this->resourcelink,
             );
@@ -53,7 +53,7 @@ class resource_link_launch_service_facade implements launch_service_facade_inter
                 toolconfig: $this->toolconfig,
                 messagetype: $this->messagetype,
                 targetlinkuri: $this->resourcelink->get('url'),
-                context: $this->context,
+                course: $this->course,
                 userid: $this->userid,
                 resourcelink: $this->resourcelink,
             );

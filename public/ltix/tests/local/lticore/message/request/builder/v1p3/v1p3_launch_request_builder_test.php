@@ -22,14 +22,14 @@ use Firebase\JWT\JWK;
 use Firebase\JWT\JWT;
 
 /**
- * Tests covering resource_link.
+ * Tests covering v1p3_launch_request_builder.
  *
  * @covers     \core_ltix\local\lticore\message\request\builder\v1p3\v1p3_launch_request_builder
  * @package    core_ltix
  * @copyright  2025 Jake Dallimore <jrhdallimore@gmail.com>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
-class v1p3_launch_request_builder_test extends \advanced_testcase {
+class v1p3_launch_request_builder_test extends \basic_testcase {
 
     /**
      * Test building the initiate login launch message.
@@ -41,7 +41,7 @@ class v1p3_launch_request_builder_test extends \advanced_testcase {
         $toolconfig = (object) [
             'id' => '123',
             'lti_clientid' => '123456-abcd',
-            'lti_ltiversion' => '1.3.0',
+            'lti_ltiversion' => \core_ltix\constants::LTI_VERSION_1P3,
             'lti_initiatelogin' => 'https://tool.example.com/lti/initiatelogin',
         ];
 

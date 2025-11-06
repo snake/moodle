@@ -21,6 +21,10 @@ use core_ltix\local\lticore\message\payload\custom\custom_param_parser;
 use core_ltix\local\lticore\message\payload\custom\factory\custom_param_parser_factory;
 use core_ltix\local\lticore\message\payload\lis_vocab_converter;
 use core_ltix\local\lticore\message\payload\lti_1px_payload_converter;
+use core_ltix\local\lticore\message\substitition\resolver\resolve_context;
+use core_ltix\local\lticore\message\substitition\v1px_variable_substitutor;
+use core_ltix\local\lticore\message\substitition\variable_substitutor;
+use core_ltix\local\lticore\message\substitition\variable_substitutor_factory;
 use core_ltix\local\lticore\repository\tool_registration_repository;
 use core_ltix\local\lticore\token\lti_token;
 use core_ltix\local\ltiopenid\jwks_helper;
@@ -82,18 +86,21 @@ final class lti_oidc_authenticator_test extends \basic_testcase {
         $stubregistrationrepo->method('get_by_id')
             ->willReturn($toolconfig);
 
-        // Stub a custom_param_parser instance.
+        // Stub a substitutor instance.
         // This example just substitutes any $Person.xx param with the user's full name, otherwise returns the unmodified value.
-        $stubcustomparamparser = $this->createStub(custom_param_parser::class);
-        $stubcustomparamparser->method('parse')
-            ->willReturnCallback(function($customparam, $sourcedata) use ($authuser) {
-                if (str_starts_with($customparam, '$Person.')) {
-                    return !empty($sourcedata['lis_person_name_full']) ? $sourcedata['lis_person_name_full'] : $customparam;
-                }
-                return $customparam;
+        $stubcustomparamparser = $this->createStub(variable_substitutor::class);
+        $stubcustomparamparser->method('substitute')
+            ->willReturnCallback(function(array $customparams, resolve_context $resolvecontext) use ($authuser) {
+                $userdata = $authuser->get_unformatted_userdata();
+                return array_map(function($customparam) use ($userdata) {
+                    if (str_starts_with($customparam, '$Person.')) {
+                        return !empty($userdata['lis_person_name_full']) ? $userdata['lis_person_name_full'] : $customparam;
+                    }
+                    return $customparam;
+                }, $customparams);
             });
-        $stubcustomparamparserfactory = $this->createStub(custom_param_parser_factory::class);
-        $stubcustomparamparserfactory->method('get_parser_from_auth_request')
+        $stubcustomparamparserfactory = $this->createStub(variable_substitutor_factory::class);
+        $stubcustomparamparserfactory->method('get_for_tool')
             ->willReturn($stubcustomparamparser);
 
         return [
@@ -132,7 +139,7 @@ final class lti_oidc_authenticator_test extends \basic_testcase {
             userauthenticator: $stubuserauthenticator,
             registrationrepository: $stubregistrationrepo,
             payloadconverter: new lti_1px_payload_converter(new lis_vocab_converter()),
-            customparamparserfactory: $stubcustomparamparserfactory,
+            substitutorfactory: $stubcustomparamparserfactory,
             jwks: $keys['jwks']
         );
 

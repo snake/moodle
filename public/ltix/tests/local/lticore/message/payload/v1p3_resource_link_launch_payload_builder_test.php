@@ -19,7 +19,8 @@ namespace core_ltix\local\lticore\message\payload;
 use core_ltix\constants;
 use core_ltix\helper;
 use core_ltix\local\lticore\facades\service\resource_link_launch_service_facade;
-use core_ltix\local\lticore\message\payload\custom\custom_param_parser;
+use core_ltix\local\lticore\facades\service\substitution_service_facade;
+use core_ltix\local\lticore\message\substitition\variable_substitutor_factory;
 use core_ltix\local\lticore\models\resource_link;
 use core_ltix\oauth_helper;
 use PHPUnit\Framework\Attributes\CoversClass;
@@ -88,10 +89,10 @@ final class v1p3_resource_link_launch_payload_builder_test extends \advanced_tes
         ]);
 
         // Stub service claim builder simulating both target_link_uri override and custom parameter inclusion for services.
-        $servicefacadestub = $this->createStub(resource_link_launch_service_facade::class);
-        $servicefacadestub->method('get_target_link_uri')
+        $rllservicefacadestub = $this->createStub(resource_link_launch_service_facade::class);
+        $rllservicefacadestub->method('get_target_link_uri')
             ->willReturn('https://tool.example.com/lti/resource/1/subreviewlaunch');
-        $servicefacadestub->method('get_launch_parameters')
+        $rllservicefacadestub->method('get_launch_parameters')
             ->willReturn([
                 'something' => 'custom service data trumps link-level data with the same name',
                 'substitution' => '$User.username',
@@ -100,10 +101,16 @@ final class v1p3_resource_link_launch_payload_builder_test extends \advanced_tes
                 'another_custom_claim' => 'https://lms.example.com/something',
                 'example_service_param' => '$Service.substitution.example'
             ]);
-        $servicefacadestub->method('parse_custom_param_value')
-            ->willReturnMap([
-                ['$Service.substitution.example', 'value resolved by service substitution'],
-            ]);
+
+        // TODO: for the test to work properly, this should be a new stub substitution_service_facade.
+        $subservicefacadestub = $this->createStub(substitution_service_facade::class);
+        $subservicefacadestub->method('substitute')
+            ->willReturnCallback(function ($param) {
+                if ($param == '$Service.substitution.example') {
+                    return 'value resolved by service substitution';
+                }
+                return $param;
+            });
 
         // Mock some extra claim mapping to confirm service parameters can be mapped to claims.
         $claimmapping = array_merge(
@@ -122,17 +129,49 @@ final class v1p3_resource_link_launch_payload_builder_test extends \advanced_tes
         // Note: the custom_param_parser dependency is NOT given a $user, and therefore won't resolve user data substitutions.
         // This reflects how launch payload is expected to be created, prior to the auth stage, when user-centric substitution
         // variables are resolved once the user is auth'd.
+//        $claimbuilder = new v1p3_resource_link_launch_payload_builder(
+//            toolconfig: $toolconfig,
+//            resourcelink: $resourcelink,
+//            user: $user,
+//            servicefacade: $servicefacadestub,
+//            paramsubstitutor: new v1px_parameter_substitutor(
+//                // Configured like this, the parameter substitutor will not resolve user params.
+//                new common_parameter_substitutor(
+//                    helper::get_capabilities(),
+//                    $context,
+//                ),
+//                $servicefacadestub
+//            ),
+//            claimconverter: new lti_1px_payload_converter(
+//                lisvocabconverter: new lis_vocab_converter(),
+//                jwtclaimmapping: $claimmapping,
+//            ),
+//        );
+
+//        $claimbuilder = new v1p3_resource_link_launch_payload_builder(
+//            toolconfig: $toolconfig,
+//            resourcelink: $resourcelink,
+//            user: $user,
+//            servicefacade: $servicefacadestub,
+//            parserfactory: new custom_param_parser_factory(),
+//            claimconverter: new lti_1px_payload_converter(
+//                lisvocabconverter: new lis_vocab_converter(),
+//                jwtclaimmapping: $claimmapping,
+//            ),
+//        );
+
         $claimbuilder = new v1p3_resource_link_launch_payload_builder(
             toolconfig: $toolconfig,
             resourcelink: $resourcelink,
             user: $user,
-            servicefacade: $servicefacadestub,
-            customparamparser: new custom_param_parser(helper::get_capabilities(), $servicefacadestub, $context),
+            servicefacade: $rllservicefacadestub,
+            parserfactory: new variable_substitutor_factory($subservicefacadestub),
             claimconverter: new lti_1px_payload_converter(
                 lisvocabconverter: new lis_vocab_converter(),
                 jwtclaimmapping: $claimmapping,
             ),
         );
+
         $claims = $claimbuilder->get_claims();
 
         // Any required claims for a Resource Link Launch Request are resolved by the request builders for the respective

@@ -186,7 +186,7 @@ class gradebookservices extends service_base {
         \stdClass $toolconfig,
         string $messagetype,
         string $targetlinkuri,
-        context $context,
+        \stdClass $course,
         int $userid,
         ?resource_link $resourcelink = null
     ): string {
@@ -199,7 +199,7 @@ class gradebookservices extends service_base {
 
             // The following will return false if the context can't return a course.
             // A retrievable course context is an expectation for a gradable resource link.
-            if (($course = $context->get_course_context(false)) !== false) {
+            //if (($course = $context->get_course_context(false)) !== false) {
                 global $DB;
                 $conditions = ['courseid' => $course->id, 'ltilinkid' => $resourcelink->get('id')];
                 $coupledlineitems = $DB->get_records('ltixservice_gradebookservices', $conditions);
@@ -211,7 +211,7 @@ class gradebookservices extends service_base {
                         $targetlinkuri = $url;
                     }
                 }
-            }
+            //}
         }
         return $targetlinkuri;
     }
@@ -330,7 +330,7 @@ class gradebookservices extends service_base {
         \stdClass $toolconfig,
         string $messagetype,
         string $targetlinkuri,
-        context $context,
+        \stdClass $course,
         int $userid,
         ?resource_link $resourcelink = null
     ): array {

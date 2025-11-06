@@ -20,8 +20,9 @@ use core_ltix\local\lticore\exception\lti_exception;
 use core_ltix\local\lticore\message\lti_message;
 use core_ltix\local\lticore\message\lti_message_base;
 use core_ltix\local\lticore\message\payload\custom\custom_param_parser;
-use core_ltix\local\lticore\message\payload\custom\factory\custom_param_parser_factory;
 use core_ltix\local\lticore\message\payload\lti_1px_payload_converter;
+use core_ltix\local\lticore\message\substitition\resolver\resolve_context;
+use core_ltix\local\lticore\message\substitition\variable_substitutor_factory;
 use core_ltix\local\lticore\repository\tool_registration_repository;
 use core_ltix\local\lticore\token\lti_token;
 
@@ -40,14 +41,14 @@ final class lti_oidc_authenticator {
      * @param lti_user_authenticator_interface $userauthenticator user authenticator which performs user auth.
      * @param tool_registration_repository $registrationrepository a repository used to fetch the tool registration.
      * @param lti_1px_payload_converter $payloadconverter a converter instance to turn legacy payload data into 1p3 JWT claims.
-     * @param custom_param_parser_factory $customparamparserfactory factory to get a custom param parser instance.
+     * @param variable_substitutor_factory $substitutorfactory factory to get a parameter substitutor instance.
      * @param array $jwks array representation of the JWKS JSON, used to decode the JWT in the auth request.
      */
     public function __construct(
         protected lti_user_authenticator_interface $userauthenticator,
         protected tool_registration_repository     $registrationrepository,
         protected lti_1px_payload_converter        $payloadconverter,
-        protected custom_param_parser_factory      $customparamparserfactory,
+        protected variable_substitutor_factory     $substitutorfactory,
         protected array                            $jwks // TODO needs to be a key object that contains jwks + private key information.
     ) {
     }
@@ -88,8 +89,8 @@ final class lti_oidc_authenticator {
         // User data isn't present at launch initiation time, so this final substitution of claims needs to be done here,
         // in case any custom param property uses a user-centric substitution param.
         $launchtoken = $this->resolve_substitution(
+            $toolconfig,
             $launchtoken,
-            $this->customparamparserfactory->get_parser_from_auth_request($toolconfig, $launchtoken, $ltiuser),
             $ltiuser
         );
 
@@ -131,23 +132,42 @@ final class lti_oidc_authenticator {
     /**
      * Perform substitution of custom params which may include user-centric substitution variables.
      *
+     * @param \stdClass $toolconfig the tool config.
      * @param lti_token $launchtoken the launch token in which the custom claims reside.
-     * @param custom_param_parser $parser a custom parameter parser.
      * @param lti_user $ltiuser the LTI authenticated user.
-     * @return lti_token the update launch token.
+     * @return lti_token the updated launch token.
      */
-    private function resolve_substitution(lti_token $launchtoken, custom_param_parser $parser, lti_user $ltiuser): lti_token {
+    private function resolve_substitution(\stdClass $toolconfig, lti_token $launchtoken, lti_user $ltiuser): lti_token {
 
-        $unformatteduserdata = $ltiuser->get_unformatted_userdata();
-
-        $claims = array_map(
-            fn($claimval) => $parser->parse($claimval, $unformatteduserdata),
-            $launchtoken->get_claim(\core_ltix\constants::LTI_JWT_CLAIM_PREFIX.'/claim/custom') ?? []
+        $context = \core\context\course::instance(
+            $launchtoken->get_claim(\core_ltix\constants::LTI_JWT_CLAIM_PREFIX.'/claim/context')['id']
         );
-
-        $launchtoken->add_claim(\core_ltix\constants::LTI_JWT_CLAIM_PREFIX.'/claim/custom', $claims);
-
+        // TODO: finish rewriting this using the variable_substitutor_factory.
+        // Just need to fix the context thing below....
+        $customparams = $launchtoken->get_claim(\core_ltix\constants::LTI_JWT_CLAIM_PREFIX.'/claim/custom') ?? [];
+        $substitutionhandler = $this->substitutorfactory->get_for_tool($toolconfig);
+        $substitutedcustomparams = $substitutionhandler->substitute(
+            $customparams,
+            new resolve_context(
+                $context
+                [],
+                $ltiuser
+            )
+        );
+        $launchtoken->add_claim(\core_ltix\constants::LTI_JWT_CLAIM_PREFIX.'/claim/custom', $substitutedcustomparams);
         return $launchtoken;
+
+//        $substitutionhandler = $this->customparamparserfactory->get_substitutor_from_auth_request(
+//            $toolconfig,
+//            $launchtoken,
+//            $ltiuser,
+//        );
+
+//        $customparams = $launchtoken->get_claim(\core_ltix\constants::LTI_JWT_CLAIM_PREFIX.'/claim/custom') ?? [];
+//        $substitutedcustomparams = $substitutionhandler->substitute($customparams);
+//        $launchtoken->add_claim(\core_ltix\constants::LTI_JWT_CLAIM_PREFIX.'/claim/custom', $substitutedcustomparams);
+//
+//        return $launchtoken;
     }
 
     /**

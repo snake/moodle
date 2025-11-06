@@ -71,6 +71,7 @@ class v1p1_resource_link_launch_payload_builder {
             'launchpresentation' => $this->get_unformatted_launch_presentation_data(),
             'lis' => $this->get_unformatted_lis_data(),
             'user' => $this->get_unformatted_user_data(),
+            // TODO: extension params ext_. See 2p0 builder.
         ];
         $unformattedpayloaddata = array_merge(...array_values($unformattedpayloaddata)); // Flatten the above.
 

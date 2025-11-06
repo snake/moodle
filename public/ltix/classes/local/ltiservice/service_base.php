@@ -270,7 +270,7 @@ abstract class service_base {
         \stdClass $toolconfig,
         string $messagetype,
         string $targetlinkuri,
-        context $context,
+        \stdClass $course,
         int $userid,
         ?resource_link $resourcelink = null
     ): string {
@@ -362,7 +362,7 @@ abstract class service_base {
         \stdClass $toolconfig,
         string $messagetype,
         string $targetlinkuri,
-        context $context,
+        \stdClass $course,
         int $userid,
         ?resource_link $resourcelink = null
     ): array {

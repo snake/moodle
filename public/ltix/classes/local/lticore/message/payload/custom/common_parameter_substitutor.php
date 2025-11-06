@@ -17,55 +17,76 @@
 namespace core_ltix\local\lticore\message\payload\custom;
 
 use core_ltix\helper;
-use core_ltix\local\lticore\facades\service\launch_service_facade_interface;
 
+/**
+ * Substitutor encapsulating common placeholder substitution logic, and which does not impose specific LTI-version-related rules.
+ *
+ * Specific LTI-version-related substitution instances should create wrappers around this if they need additional control over
+ * substitution.
+ *
+ * Common substitution logic includes:
+ * - resolving a placeholder to a value in sourcedata
+ * - resolving a placeholder to a property of a global ($USER and $COURSE supported).
+ * - resolving a placeholder to a calculated value
+ *
+ * @package    core_ltix
+ * @copyright  2025 Jake Dallimore <jrhdallimore@gmail.com>
+ * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
+ */
+class common_parameter_substitutor implements parameter_substitutor_interface {
 
-// TODO: create an interface.
-class custom_param_parser {
-
+    /**
+     * Constructor.
+     *
+     * @param array $sourcedatamap maps parameter keys (e.g. $User.id) to keys in the lookup data array (or to globals).
+     * @param \core\context $context a context instance, used to resolve context values.
+     * @param \stdClass|null $user user record, or null to prevent substitution to $USER->xxx values.
+     */
     public function __construct(
         protected array $sourcedatamap,
-        protected launch_service_facade_interface $servicefacade,
         protected \core\context $context,
         protected ?\stdClass $user = null,
     ) {
     }
 
-    // Logic overview: 4 ways it can be resolved, else it remains unchanged.
-    // If present in the dictionary, either:
-    // a) value is matched to a value in sourcedata or
-    // b) value is matched to a global or, finally;
-    // c) value is calculated (if dictionary entry is falsey).
-    // If not present in the dictionary:
-    // d) delegate to the servicefacade to attempt to resolve via the tool services.
-//    public function parse_all(array $customparams, array $sourcedata): array {
-//        $parsed = [];
-//        foreach ($customparams as $key => $paramvalue) {
-//            $parsed[$key] = $this->parse($paramvalue, $sourcedata);
-//        }
-//        return $parsed;
-//    }
-
-    public function parse(string $customparam, array $sourcedata): string {
+    /**
+     * Substitute the variable in $customparam with its corresponding value.
+     *
+     * @param string $customparam
+     * @param array $sourcedata
+     * @return string
+     */
+    public function substitute(string $customparam, array $sourcedata): string {
         $value = $customparam;
-        if (substr($value, 0, 1) == '\\') {
+        if (str_starts_with($value, '\\')) {
             $value = substr($value, 1);
-        } else if (substr($value, 0, 1) == '$') {
+        } else if (str_starts_with($value, '$')) {
             $value1 = substr($value, 1);
             if (array_key_exists($value1, $this->sourcedatamap)) {
                 $value = $this->resolve_from_map($value1, $sourcedata);
-            } else {
-                // Substitution for params defined in services: allow services to resolve these.
-                $value = $this->services_parse_custom_param($value);
             }
         }
         return $value;
     }
 
+    /**
+     * Resolve a variable to its corresponding dictionary or calculated value.
+     *
+     * This assumes the value exists as a key in {@link self::sourcedatamap}.
+     *
+     * There are 3 ways a variable can be resolved:
+     * a) The value is matched to a value in sourcedata or
+     * b) The value is matched to a global or, finally;
+     * c) The value is calculated (if the dictionary entry is false-y).
+     *
+     * @param string $paramvalue the value to substitute
+     * @param array $sourcedata array of ['key' => 'value'] pairs, which will be substituted if a param is mapped to the 'key'.
+     * @return string the substituted/calculated value.
+     */
     protected function resolve_from_map(string $paramvalue, array $sourcedata): string {
         $val = $this->sourcedatamap[$paramvalue];
         if ($val) {
-            if (substr($val, 0, 1) != '$') {
+            if (!str_starts_with($val, '$')) {
                 $value = $sourcedata[$val] ?? "$".$paramvalue; // Resolve, if present, from source data, else leave unresolved.
             } else {
                 $valarr = explode('->', substr($val, 1), 2);
@@ -77,7 +98,7 @@ class custom_param_parser {
                     // Resolve course from the context in which substitution is taking place:
                     // If the context can resolve a parent course, then use that, else skip substitution for the param.
                     /** @var \core\context\course $coursecontext */
-                    if (($coursecontext = $this?->context->get_course_context()) !== null) {
+                    if (($coursecontext = $this?->context->get_course_context(false)) !== false) {
                         $course = get_course($coursecontext->instanceid);
                         $value = $course->{$valarr[1]} ?? "$".$paramvalue;
                     }
@@ -90,10 +111,6 @@ class custom_param_parser {
             $value = $this->resolve_calculated($paramvalue);
         }
         return $value;
-    }
-
-    protected function services_parse_custom_param($val): string {
-        return $this->servicefacade->parse_custom_param_value($val);
     }
 
     /**

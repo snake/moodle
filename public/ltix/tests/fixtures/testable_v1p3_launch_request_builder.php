@@ -22,6 +22,7 @@ class testable_v1p3_launch_request_builder extends v1p3_launch_request_builder {
 
     /**
      * Subclass for testing the base functionality provided by the v1p3_launch_request_builder class.
+     *
      * @param \stdClass $toolconfig
      * @param string $messagetype
      * @param string $issuer

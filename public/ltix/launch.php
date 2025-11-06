@@ -92,6 +92,10 @@ $launchconfig = (object) [
     //  That way, the factory won't have to infer that based on other information like resourcelink being present (which may be the
     //  case for several types of launches (e.g. resourcelink, submissionreview).
 ];
+\core\di::set('converter', 10);
+//\core\di::set('converter', \DI\value(function() { return 10; }));
+$val = \core\di::get('converter');
+
 $requestbuilderfactory = \core\di::get(builder_factory::class);
 echo $requestbuilderfactory->get_request_builder($launchconfig)
     ->build_message()

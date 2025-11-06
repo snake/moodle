@@ -19,7 +19,12 @@ namespace core_ltix\local\lticore\message\payload;
 use core_ltix\constants;
 use core_ltix\helper;
 use core_ltix\local\lticore\facades\service\resource_link_launch_service_facade;
+use core_ltix\local\lticore\facades\service\substitution_service_facade;
 use core_ltix\local\lticore\message\payload\custom\custom_param_parser;
+use core_ltix\local\lticore\message\payload\custom\factory\custom_param_parser_factory;
+use core_ltix\local\lticore\message\payload\custom\v1px_parameter_substitutor;
+use core_ltix\local\lticore\message\substitition\resolver\resolve_context;
+use core_ltix\local\lticore\message\substitition\variable_substitutor_factory;
 use core_ltix\local\lticore\models\resource_link;
 
 /**
@@ -58,7 +63,7 @@ class v1p3_resource_link_launch_payload_builder implements v1p3_message_payload_
         protected resource_link $resourcelink,
         protected \stdClass $user,
         protected resource_link_launch_service_facade $servicefacade,
-        protected custom_param_parser $customparamparser,
+        protected variable_substitutor_factory $parserfactory,
         protected v1px_payload_converter_interface $claimconverter,
     ) {
     }
@@ -78,6 +83,7 @@ class v1p3_resource_link_launch_payload_builder implements v1p3_message_payload_
             'toolplatform' => $this->get_unformatted_tool_platform_data(),
             'launchpresentation' => $this->get_unformatted_launch_presentation_data($this->resourcelink, $this->toolconfig),
             'lis' => $this->get_unformatted_lis_data($this->resourcelink, $this->user, $this->toolconfig),
+            // TODO: extension params ext_. See 2p0 builder.
         ];
         $unformattedpayloaddata = array_merge(...array_values($unformattedpayloaddata)); // Flatten the above.
 
@@ -100,7 +106,7 @@ class v1p3_resource_link_launch_payload_builder implements v1p3_message_payload_
         // Perform substitution for custom params.
         // Note: this won't perform substitution for variables referencing any of the user claims, since user claims aren't
         // yet present in the payload. Substitution needs to be re-run against the unformatted user data at auth time.
-        $unformattedpayloaddata = $this->resolve_substitution($unformattedpayloaddata, $this->customparamparser);
+        $unformattedpayloaddata = $this->resolve_substitution($unformattedpayloaddata);
 
         return $this->claimconverter->params_to_claims($unformattedpayloaddata);
     }
@@ -289,16 +295,23 @@ class v1p3_resource_link_launch_payload_builder implements v1p3_message_payload_
 
     protected function resolve_substitution(
         array $payloaddata,
-        custom_param_parser $customparamparser
     ): array {
-        foreach ($payloaddata as $key => $value) {
-            // Substitution is only performed for custom params.
-            if (str_starts_with($key, 'custom_')) {
-                $payloaddata[$key] = $customparamparser->parse($value, $payloaddata);
-            }
-        }
 
-        return $payloaddata;
+        // Only the custom claim parameters are subject to substitution.
+        $rawcustomparams = array_filter($payloaddata, fn($key) => str_starts_with($key, 'custom_'), ARRAY_FILTER_USE_KEY);
+
+        $substitutor = $this->parserfactory->get_for_tool($this->toolconfig);
+        return array_merge(
+            $payloaddata,
+            $substitutor->substitute(
+                $rawcustomparams,
+                new resolve_context(
+                    context: \core\context::instance_by_id($this->resourcelink->get('contextid')),
+                    sourcedata: $payloaddata,
+                    ltiuser: null
+                )
+            )
+        );
     }
 
     protected function get_unformatted_resource_link_data(resource_link $resourcelink): array {

@@ -39,6 +39,12 @@ use core_ltix\local\lticore\message\request\builder\v1p3\v1p3_resource_link_laun
  */
 class builder_factory {
 
+    public function __construct(protected int $converter) {
+        if (true) {
+
+        }
+    }
+
     /**
      * Get a builder instance based on launch config.
      *
