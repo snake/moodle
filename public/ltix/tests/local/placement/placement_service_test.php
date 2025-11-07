@@ -17,45 +17,41 @@
 namespace core_ltix\local\placement;
 
 use core_ltix\constants;
-use core_ltix\local\placement\placement_service;
+use core_ltix\local\lticore\models\resource_link;
+use PHPUnit\Framework\Attributes\CoversClass;
+use PHPUnit\Framework\Attributes\DataProvider;
 
 /**
  * Test class for \core_ltix\local\placement\placement_service.
  *
- * @covers \core_ltix\local\placement\placement_service
  * @package    core_ltix
  * @copyright  2025 Muhammad Arnaldo <muhammad.arnaldo@moodle.com>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
+#[CoversClass(\core_ltix\local\placement\placement_service::class)]
 final class placement_service_test extends \advanced_testcase {
     /**
      * Test getting launch container for a link.
      *
-     * @dataProvider get_launch_container_provider
      * @param int|null $toollaunchcontainer Launch container from tool type
      * @param int|null $linklaunchcontainer Launch container from link
      * @param int $expected Expected result
      * @param bool $mobile If test should simulate mobile device
      */
+    #[DataProvider('get_launch_container_provider')]
     public function test_get_launch_container_for_link(
         ?int $toollaunchcontainer,
         ?int $linklaunchcontainer,
-        ?int $expected,
+        int $expected,
         bool $mobile = false
     ): void {
-        global $DB;
-
         $this->resetAfterTest();
-        $this->setAdminUser();
 
         if ($mobile) {
             $this->pretend_to_be_mobile_device();
         }
 
-        // Create a course.
-        $course = $this->getDataGenerator()->create_course();
-
-        // Create a tool type.
+        /** @var \core_ltix_generator $ltigenerator */
         $ltigenerator = $this->getDataGenerator()->get_plugin_generator('core_ltix');
         $typeid = $ltigenerator->create_tool_types([
             'name' => 'Test Tool',
@@ -63,26 +59,29 @@ final class placement_service_test extends \advanced_testcase {
             'lti_launchcontainer' => $toollaunchcontainer,
         ]);
 
-        // Create an LTI instance with the tool type.
-        $this->getDataGenerator()->create_module(
-            'lti',
-            [
-                'course' => $course->id,
-                'typeid' => $typeid,
-            ]
-        );
+        $reslink = new resource_link(0, (object) [
+            'typeid' => $typeid,
+            'component' => 'some_component',
+            'itemtype' => 'some_component:placementtype',
+            'itemid' => 999,
+            'contextid' => 999,
+            'url' => 'stub',
+            'title' => 'stub',
+            'text' => 'stub',
+            'textformat' => 0,
+            'gradable' => true,
+            'servicesalt' => 'stub',
+            ...(!is_null($linklaunchcontainer) ? ['launchcontainer' => $linklaunchcontainer] : []),
+        ]);
 
-        $link = $DB->get_record('lti_resource_link', ['typeid' => $typeid]);
-        if ($linklaunchcontainer !== null) {
-            $link->launchcontainer = $linklaunchcontainer;
-        }
-
-        $launchcontainer = placement_service::get_launch_container_for_link($link);
+        $launchcontainer = placement_service::get_launch_container_for_link($reslink);
         $this->assertEquals($expected, $launchcontainer);
     }
 
     /**
      * Data provider for test_get_launch_container_for_link.
+     *
+     * @return array the test case data.
      */
     public static function get_launch_container_provider(): array {
         return [
@@ -127,6 +126,8 @@ final class placement_service_test extends \advanced_testcase {
 
     /**
      * Helper method to simulate mobile device.
+     *
+     * @return void.
      */
     private function pretend_to_be_mobile_device(): void {
         \core_useragent::instance(true, 'Mozilla/5.0 (iPhone; CPU iPhone OS 14_0 like Mac OS X)');
