@@ -414,6 +414,17 @@ function lti_get_coursemodule_info($coursemodule) {
         $info->content = format_module_intro('lti', $lti, $coursemodule->id, false);
     }
 
+    // TODO: this should be replaced by a call to link_manager::get_resource_link() when MDL-85331 lands.
+    $resourcelink = \core_ltix\local\lticore\models\resource_link::get_record([
+        'component' => 'mod_lti',
+        'itemtype' => 'mod_lti:activityplacement',
+        'itemid' => $coursemodule->id,
+        'contextid' => \core\context\module::instance($coursemodule->id)->id
+    ]);
+
+    // TODO: For the given resource link, get the icon by asking the \core_ltix\local\placement\placement_service for that.
+    //  All this code dealing with fallbacks to tool, https, etc should live there and placement implementations just fetch the
+    //  icon from there.
     if (!empty($lti->typeid)) {
         $toolconfig = \core_ltix\helper::get_type_config($lti->typeid);
     } else if ($tool = \core_ltix\helper::get_tool_by_url_match($lti->toolurl)) {
@@ -421,7 +432,6 @@ function lti_get_coursemodule_info($coursemodule) {
     } else {
         $toolconfig = array();
     }
-
     // We want to use the right icon based on whether the
     // current page is being requested over http or https.
     if (\core_ltix\helper::request_is_using_ssl() &&
@@ -437,9 +447,10 @@ function lti_get_coursemodule_info($coursemodule) {
         $info->iconurl = new moodle_url($toolconfig['icon']);
     }
 
-    // Does the link open in a new window?
-    $launchcontainer = \core_ltix\helper::get_launch_container($lti, $toolconfig);
+    // If the link is configured to open in a new window, let that happen right from the course main page via this onclick.
+    $launchcontainer = \core_ltix\local\placement\placement_service::get_launch_container_for_link($resourcelink);
     if ($launchcontainer == \core_ltix\constants::LTI_LAUNCH_CONTAINER_WINDOW) {
+        // TODO: When we have a core_ltix API to get the launch URL for a link, use that instead here.
         $launchurl = new moodle_url('/mod/lti/launch.php', array('id' => $coursemodule->id));
         $info->onclick = "window.open('" . $launchurl->out(false) . "', 'lti-".$coursemodule->id."'); return false;";
     }
