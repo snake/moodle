@@ -46,6 +46,8 @@
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
+use core_ltix\local\placement\placement_service;
+
 require_once('../../config.php');
 require_once($CFG->libdir.'/completionlib.php');
 require_once($CFG->dirroot.'/mod/lti/lib.php');
@@ -57,18 +59,39 @@ $action = optional_param('action', '', PARAM_TEXT);
 $foruserid = optional_param('user', 0, PARAM_INT);
 $forceview = optional_param('forceview', 0, PARAM_BOOL);
 
+global $PAGE, $USER, $OUTPUT, $DB, $SESSION;
+
 if ($l) {  // Two ways to specify the module.
     $lti = $DB->get_record('lti', array('id' => $l), '*', MUST_EXIST);
     $cm = get_coursemodule_from_instance('lti', $lti->id, $lti->course, false, MUST_EXIST);
-
 } else {
     $cm = get_coursemodule_from_id('lti', $id, 0, false, MUST_EXIST);
     $lti = $DB->get_record('lti', array('id' => $cm->instance), '*', MUST_EXIST);
 }
-
 $course = $DB->get_record('course', array('id' => $cm->course), '*', MUST_EXIST);
+$context = context_module::instance($cm->id);
 
-$typeid = $lti->typeid;
+require_login($course, true, $cm);
+require_capability('mod/lti:view', $context);
+
+// Note: This cap check pertains to the submission review message as it's implemented by the mod_lti:activityplacement placement.
+// A gradebook hook at mod/lti/grade.php redirects here and permits the launch to occur. Other placements supporting submission
+// review messages may not require this capability, so the check is implemented here, not in core_ltix.
+if (!empty($foruserid) && (int)$foruserid !== (int)$USER->id) {
+    require_capability('gradereport/grader:view', $context);
+}
+
+// TODO: this should be replaced by a call to link_manager::get_resource_link() when MDL-85331 lands.
+$resourcelink = \core_ltix\local\lticore\models\resource_link::get_record([
+    'component' => 'mod_lti',
+    'itemtype' => 'mod_lti:activityplacement',
+    'itemid' => $cm->id,
+    'contextid' => $context->id
+]);
+
+// TODO: this code can be removed when the launch builders land.
+//  Calling code then won't need to know the tool url it will be resolved inside of core_ltix by passing the link.
+$typeid = $resourcelink->get('typeid');
 if (empty($typeid) && ($tool = \core_ltix\helper::get_tool_by_url_match($lti->toolurl))) {
     $typeid = $tool->id;
 }
@@ -79,32 +102,23 @@ if ($typeid) {
         $toolurl = $toolconfig['toolurl'];
     }
 } else {
-    $toolconfig = array();
-    $toolurl = $lti->toolurl;
+    $toolurl = $resourcelink->get('url');
 }
 
-$PAGE->set_cm($cm, $course); // Set's up global $COURSE.
-$context = context_module::instance($cm->id);
-$PAGE->set_context($context);
-
-require_login($course, true, $cm);
-require_capability('mod/lti:view', $context);
-
-if (!empty($foruserid) && (int)$foruserid !== (int)$USER->id) {
-    require_capability('gradereport/grader:view', $context);
-}
-
-$url = new moodle_url('/mod/lti/view.php', array('id' => $cm->id));
-$PAGE->set_url($url);
-
-
+// TODO: this code can be removed when the launch builders land. Then, core_ltix will throw when the configuration is bad, instead
+//  of having to handle it in calling code like this.
 if (!empty($missingtooltype)) {
     $PAGE->set_pagelayout('incourse');
     echo $OUTPUT->header();
     throw new moodle_exception('tooltypenotfounderror', 'mod_lti');
 }
 
-$launchcontainer = \core_ltix\helper::get_launch_container($lti, $toolconfig);
+// TODO: consider refactoring this page layout/blocks/redirect code. Can any of it be moved to core_ltix?
+//  I suspect that:
+//  - blocks configuration can
+//  - redirection can
+//  and then just use a default pagelayout of 'incourse' if we haven't been redirected.
+$launchcontainer = placement_service::get_launch_container_for_link($resourcelink);
 
 if ($launchcontainer == \core_ltix\constants::LTI_LAUNCH_CONTAINER_EMBED_NO_BLOCKS) {
     $PAGE->set_pagelayout('incourse');
@@ -118,30 +132,8 @@ if ($launchcontainer == \core_ltix\constants::LTI_LAUNCH_CONTAINER_EMBED_NO_BLOC
     $PAGE->set_pagelayout('incourse');
 }
 
-lti_view($lti, $course, $cm, $context);
-
-$pagetitle = strip_tags($course->shortname.': '.format_string($lti->name));
-$PAGE->set_title($pagetitle);
-$PAGE->set_heading($course->fullname);
-
-$activityheader = $PAGE->activityheader;
-if (!$lti->showtitlelaunch) {
-    $header['title'] = '';
-}
-if (!$lti->showdescriptionlaunch) {
-    $header['description'] = '';
-}
-$activityheader->set_attrs($header ?? []);
-
-// Print the page header.
-echo $OUTPUT->header();
-
-if ($typeid) {
-    $config = \core_ltix\helper::get_type_type_config($typeid);
-} else {
-    $config = new stdClass();
-    $config->lti_ltiversion = \core_ltix\constants::LTI_VERSION_1;
-}
+// TODO: see the todo below around launch html. Once we're able to fetch launch html from core_ltix (or something like that), then
+//  there is no need to know the launchurl here.
 $launchurl = new moodle_url('/mod/lti/launch.php', ['id' => $cm->id, 'triggerview' => 0]);
 if ($action) {
     $launchurl->param('action', $action);;
@@ -149,7 +141,28 @@ if ($action) {
 if ($foruserid) {
     $launchurl->param('user', $foruserid);;
 }
+
+lti_view($lti, $course, $cm, $context);
+
+$PAGE->set_url(new moodle_url('/mod/lti/view.php', array('id' => $cm->id)));
+$PAGE->set_cm($cm, $course);
+$PAGE->set_context($context);
+$PAGE->set_title(strip_tags($course->shortname.': '.format_string($lti->name)));
+$PAGE->set_heading($course->fullname);
+if (!$lti->showtitlelaunch) {
+    $header['title'] = '';
+}
+if (!$lti->showdescriptionlaunch) {
+    $header['description'] = '';
+}
+$PAGE->activityheader->set_attrs($header ?? []);
+
+// TODO: I don't think this is ever set anywhere, so can probably be removed in future.
 unset($SESSION->lti_initiatelogin_status);
+
+echo $OUTPUT->header();
+
+// TODO: consider creating an API to fetch the launch html from core_ltix (e.g. new window link or iframe html returned).
 if (($launchcontainer == \core_ltix\constants::LTI_LAUNCH_CONTAINER_WINDOW)) {
     if (!$forceview) {
         echo "<script language=\"javascript\">//<![CDATA[\n";
@@ -163,8 +176,8 @@ if (($launchcontainer == \core_ltix\constants::LTI_LAUNCH_CONTAINER_WINDOW)) {
     echo html_writer::end_tag('p');
 } else {
     $content = '';
-    // Build the allowed URL, since we know what it will be from $lti->toolurl,
-    // If the specified toolurl is invalid the iframe won't load, but we still want to avoid parse related errors here.
+    // Build the allowed URL, since we know what it will be from $toolurl,
+    // If the specified tool url is invalid the iframe won't load, but we still want to avoid parse related errors here.
     // So we set an empty default allowed url, and only build a real one if the parse is successful.
     $ltiallow = '';
     $urlparts = parse_url($toolurl);
