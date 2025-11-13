@@ -34,7 +34,7 @@ Feature: Testing overview integration in database activity
       | idnumber        | data2                |
       | approval        | 1                    |
       | completion      | 1                    |
-      | comments        | 1                    |
+      | comments        | 0                    |
       | timeavailableto | ##1 Jan 2040 08:00## |
     And the following "activity" exists:
       | course          | C1                   |
@@ -96,8 +96,8 @@ Feature: Testing overview integration in database activity
     And the following should exist in the "Table listing all Database activities" table:
       | Name              | Due date       | Total entries | My entries | Comments  |
       | Database activity | 1 January 2040 | 2             | 2          | 1         |
-      | Without comments  | 1 January 2040 | 1             | 0          | 0         |
-      | Empty database    | -              | 0             | 0          | -         |
+      | Without comments  | 1 January 2040 | 1             | 0          |           |
+      | Empty database    | -              | 0             | 0          |           |
 
   @javascript
   Scenario: Teachers can see relevant columns in the database activity overview
@@ -116,8 +116,8 @@ Feature: Testing overview integration in database activity
     Then the following should exist in the "Table listing all Database activities" table:
       | Name              | Due date       | Entries | Comments | Actions     |
       | Database activity | 1 January 2040 | 3       | 1        | Approve (1) |
-      | Without comments  | 1 January 2040 | 1       | 0        | View        |
-      | Empty database    | -              | 0       | -        | View        |
+      | Without comments  | 1 January 2040 | 1       |          | View        |
+      | Empty database    | -              | 0       |          | View        |
     # Check the Approve link.
     And I click on "Approve" "link" in the "data_overview_collapsible" "region"
     And I should see "Pending approval"
