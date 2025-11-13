@@ -83,13 +83,11 @@ class overview extends \core_courseformat\activityoverviewbase {
     private function get_extra_comments_overview(): overviewitem {
         global $CFG;
 
-        // Add comments column for all views.
+        // Add comments column if config allow comments.
         if (empty($CFG->usecomments) || !$this->cm->get_instance_record()->allowcomments) {
             return new overviewitem(
                 name: get_string('comments', 'glossary'),
-                value: 0,
-                content: '-',
-                textalign: text_align::END,
+                value: null
             );
         }
 

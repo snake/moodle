@@ -21,8 +21,9 @@ Feature: Testing overview integration in mod_glossary
     And the following "activities" exist:
       | activity | name                             | course | idnumber  | defaultapproval | allowcomments |
       | glossary | Glossary without defaultapproval | C1     | glossary1 | 0               | 1             |
-      | glossary | Glossary without entries         | C1     | glossary2 | 0               | 0             |
+      | glossary | Glossary without entries         | C1     | glossary2 | 0               | 1             |
       | glossary | Glossary with comments           | C1     | glossary3 | 1               | 1             |
+      | glossary | Glossary without comments        | C1     | glossary4 | 1               | 0             |
     And the following "mod_glossary > entries" exist:
       | glossary  | user     | concept  | definition                                       | approved |
       | glossary1 | teacher1 | Dragon   | Large, winged, fire-breathing reptilian monster. | 1        |
@@ -48,8 +49,9 @@ Feature: Testing overview integration in mod_glossary
     Then the following should exist in the "Table listing all Glossary activities" table:
       | Name                             | Comments | Entries | Actions     |
       | Glossary without defaultapproval | 0        | 2       | Approve (3) |
-      | Glossary without entries         | -        | 0       | View        |
+      | Glossary without entries         | 0        | 0       | View        |
       | Glossary with comments           | 2        | 1       | View        |
+      | Glossary without comments        |          | 0       | View        |
     And I click on "Approve (3)" "link" in the "glossary_overview_collapsible" "region"
     And I should see "Pending approval (3)" in the "page-header" "region"
 
@@ -69,8 +71,9 @@ Feature: Testing overview integration in mod_glossary
     Then the following should exist in the "Table listing all Glossary activities" table:
       | Name                             | Total entries | My entries | Comments |
       | Glossary without defaultapproval | 2             | 3          | 0        |
-      | Glossary without entries         | 0             | 0          | -        |
+      | Glossary without entries         | 0             | 0          | 0        |
       | Glossary with comments           | 1             | 1          | 2        |
+      | Glossary without comments        | 0             | 0          |          |
 
   Scenario: The glossary overview report should generate log events
     Given I am on the "Course 1" "course > activities > glossary" page logged in as "teacher1"
