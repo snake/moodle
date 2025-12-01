@@ -112,6 +112,21 @@ class auth_plugin_lti extends \auth_plugin_base {
         if ($this->get_user_binding($launchdata['iss'], $launchdata['sub'])) {
             $user = $this->find_or_create_user_from_launch($launchdata);
 
+            if ($user->suspended) {
+                $failurereason = AUTH_LOGIN_SUSPENDED;
+                $event = \core\event\user_login_failed::create([
+                    'userid' => $user->id,
+                    'other' => [
+                        'username' => $user->username,
+                        'reason' => $failurereason
+                    ]
+                ]);
+                $event->trigger();
+                redirect(new moodle_url('/auth/lti/error.php', [
+                    'reason' => 'invalidlogin',
+                ]));
+            }
+
             if (isloggedin()) {
                 // If a different user is currently logged in, authenticate the linked user instead.
                 global $USER;
