@@ -518,4 +518,68 @@ final class overview_test extends \advanced_testcase {
             'expected' => 2,
         ];
     }
+
+    /**
+     * Test get_extra_comments_overview when comments are not allowed.
+     *
+     * @param bool $usecomments Whether comments are allowed globally.
+     * @param bool $comments Whether comments are allowed in the Database activity.
+     * @param string|null $expected Expected value for the overview item.
+     */
+    #[\PHPUnit\Framework\Attributes\DataProvider('provider_test_get_extra_comments_overview_with_comments_disabled')]
+    public function test_get_extra_comments_overview_with_comments_disabled(
+        bool $usecomments,
+        bool $comments,
+        ?string $expected,
+    ): void {
+        $this->resetAfterTest();
+        $this->setAdminUser();
+
+        set_config('usecomments', $usecomments);
+
+        $course = $this->getDataGenerator()->create_course();
+        $activity = $this->getDataGenerator()->create_module(
+            manager::MODULE,
+            ['course' => $course->id, 'comments' => $comments],
+        );
+        $cm = get_fast_modinfo($course)->get_cm($activity->cmid);
+
+        $overview = overviewfactory::create($cm);
+        $reflection = new \ReflectionClass($overview);
+        $method = $reflection->getMethod('get_extra_comments_overview');
+        $method->setAccessible(true);
+        $item = $method->invoke($overview);
+
+        $this->assertEquals(get_string('comments', 'data'), $item->get_name());
+        $this->assertEquals(0, $item->get_value());
+        $this->assertEquals($expected, $item->get_content());
+    }
+
+    /**
+     * Data provider for test_get_extra_comments_overview_with_comments_disabled.
+     *
+     * @return \Generator
+     */
+    public static function provider_test_get_extra_comments_overview_with_comments_disabled(): \Generator {
+        yield 'Use comments disabled, allow comments disabled' => [
+            'usecomments' => false,
+            'comments' => false,
+            'expected' => null,
+        ];
+        yield 'Use comments enabled, allow comments disabled' => [
+            'usecomments' => true,
+            'comments' => false,
+            'expected' => null,
+        ];
+        yield 'Use comments disabled, allow comments enabled' => [
+            'usecomments' => false,
+            'comments' => true,
+            'expected' => null,
+        ];
+        yield 'Use comments enabled, allow comments enabled' => [
+            'usecomments' => true,
+            'comments' => true,
+            'expected' => '0',
+        ];
+    }
 }
