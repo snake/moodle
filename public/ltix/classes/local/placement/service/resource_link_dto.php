@@ -44,9 +44,6 @@ final class resource_link_dto {
         public readonly ?string $customparams = null,
         public readonly ?string $icon = null,
     ) {
-        if ($url === '') {
-            throw new \coding_exception('URL cannot be empty');
-        }
         if ($title === '') {
             throw new \coding_exception('Title cannot be empty');
         }

@@ -18,7 +18,9 @@ namespace core_ltix\local\placement;
 
 use core\context\course;
 use core_ltix\constants;
-use core_ltix\local\placement\service\resource_link_manager;
+use core_ltix\local\placement\service\resource_link_service;
+use core_ltix\local\placement\service\resource_link_dto;
+use core_ltix\local\placement\service\external_identifier;
 
 /**
  * Test class for \core_ltix\local\placement\placement_service.
@@ -73,16 +75,23 @@ final class placement_service_test extends \advanced_testcase {
         // Create a resource link for the placement.
         $course = $this->getDataGenerator()->create_course();
 
-        $link = resource_link_manager::create_resource_link(
-            placementtype: $placementtype->type,
-            component: $placementtype->component,
-            context: course::instance($course->id),
+        $context = course::instance($course->id);
+        $identifier = external_identifier::from_context(
+            $placementtype->component,
+            $placementtype->type,
+            123456,
+            $context
+        );
+        $dto = resource_link_dto::from_create_fields(
+            external_identifier: $identifier,
             toolid: $typeid,
-            itemid: 123456, // Arbitrary value, not important for this test.
             url: new \core\url('http://lms.example.com/link'),
             title: 'Link title',
             launchcontainer: $linklaunchcontainer ?? null,
         );
+        $linkDto = \core\di::get(resource_link_service::class)->create_resource_link($dto);
+        // Get the persistent object for use with placement_service
+        $link = (new \core_ltix\local\lticore\models\resource_link())->get_record(['id' => $linkDto->id]);
 
         $launchcontainer = placement_service::get_launch_container_for_link($link);
         $this->assertEquals($expected, $launchcontainer);

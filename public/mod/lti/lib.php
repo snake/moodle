@@ -46,7 +46,9 @@
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
-use core_ltix\local\placement\service\resource_link_manager;
+use core_ltix\local\placement\service\resource_link_service;
+use core_ltix\local\placement\service\resource_link_dto;
+use core_ltix\local\placement\service\external_identifier;
 
 defined('MOODLE_INTERNAL') || die;
 
@@ -132,23 +134,26 @@ function lti_add_instance($lti, $mform) {
     $icon = !empty($lti->icon) ? $lti->icon : null;
     $customparams = !empty($lti->instructorcustomparameters) ? $lti->instructorcustomparameters : null;
 
-    // Create a resource link.
-    resource_link_manager::create_resource_link(
-        'mod_lti:activityplacement',
+    // Create a resource link using the service.
+    $identifier = external_identifier::from_context(
         'mod_lti',
-        $context,
-        $lti->typeid,
+        'mod_lti:activityplacement',
         $lti->coursemodule,
-        $lti->toolurl,
-        $lti->name,
-        $lti->intro,
-        $lti->introformat,
-        $lti->instructorchoiceacceptgrades,
-        $lti->servicesalt,
-        $launchcontainer,
-        $icon,
-        $customparams
+        $context
     );
+    $dto = resource_link_dto::from_create_fields(
+        external_identifier: $identifier,
+        toolid: $lti->typeid,
+        url: $lti->toolurl,
+        title: $lti->name,
+        text: $lti->intro,
+        textformat: $lti->introformat,
+        gradable: $lti->instructorchoiceacceptgrades,
+        launchcontainer: $launchcontainer,
+        icon: $icon,
+        customparams: $customparams
+    );
+    \core\di::get(resource_link_service::class)->create_resource_link($dto);
 
     return $lti->id;
 }
@@ -202,18 +207,37 @@ function lti_update_instance($lti, $mform) {
     $completiontimeexpected = !empty($lti->completionexpected) ? $lti->completionexpected : null;
     \core_completion\api::update_completion_date_event($lti->coursemodule, 'lti', $lti->id, $completiontimeexpected);
 
-    $ltiresourcelinkformvalues = [
+    // Update the resource link using the service.
+    $updateFields = [
         'url' => $lti->toolurl,
         'title' => $lti->name,
         'text' => $lti->intro,
         'textformat' => $lti->introformat,
         'gradable' => $lti->instructorchoiceacceptgrades,
-        ...(!isset($lti->launchcontainer) ? ['launchcontainer' => $lti->launchcontainer] : []),
-        ...(!empty($lti->icon) ? ['icon' => $lti->icon] : []),
-        ...(!empty($lti->instructorcustomparameters) ? ['customparams' => $lti->instructorcustomparameters] : []),
     ];
-    // Update the resource link.
-    resource_link_manager::update_resource_link($lti->coursemodule, $ltiresourcelinkformvalues);
+    if (isset($lti->launchcontainer)) {
+        $updateFields['launchcontainer'] = $lti->launchcontainer;
+    }
+    if (!empty($lti->icon)) {
+        $updateFields['icon'] = $lti->icon;
+    }
+    if (!empty($lti->instructorcustomparameters)) {
+        $updateFields['customparams'] = $lti->instructorcustomparameters;
+    }
+    $updateContext = \core\context\module::instance($lti->coursemodule);
+    $updateIdentifier = external_identifier::from_context(
+        'mod_lti',
+        'mod_lti:activityplacement',
+        $lti->coursemodule,
+        $updateContext
+    );
+    $updateDto = resource_link_dto::from_update_fields(
+        id: $lti->coursemodule,
+        external_identifier: $updateIdentifier,
+        toolid: $lti->typeid,
+        fields: $updateFields
+    );
+    \core\di::get(resource_link_service::class)->update_resource_link($updateDto);
 
     return $DB->update_record('lti', $lti);
 }
@@ -255,7 +279,15 @@ function lti_delete_instance($id) {
             $service->instance_deleted( $id );
         }
 
-        resource_link_manager::delete_resource_link($cm->id);
+        // Delete the resource link by external identifier.
+        $deleteContext = \core\context\module::instance($cm->id);
+        $deleteIdentifier = external_identifier::from_context(
+            'mod_lti',
+            'mod_lti:activityplacement',
+            $cm->id,
+            $deleteContext
+        );
+        \core\di::get(resource_link_service::class)->delete_by_external_id($deleteIdentifier);
 
         return true;
     }
