@@ -22,6 +22,7 @@ use core_ltix\constants;
 use core_ltix\local\lticore\models\resource_link;
 use core_ltix\local\placement\placement_repository;
 use core_ltix\local\placement\placements_manager;
+use core_useragent;
 
 /**
  * Placement resource link service class.
@@ -34,6 +35,39 @@ use core_ltix\local\placement\placements_manager;
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class resource_link_service {
+
+    /**
+     * Compute the effective launch container for a link.
+     *
+     * Resolves the launch container taking into account device type and delegation to tool config.
+     *
+     * @param ?int $launchcontainer The explicit launch container value (may be null or DEFAULT)
+     * @param ?int $toolid The tool type id for config lookup
+     * @return int The effective launch container constant
+     */
+    private function compute_effective_launchcontainer(?int $launchcontainer, ?int $toolid): int {
+        $devicetype = core_useragent::get_device_type();
+
+        // Mobile/tablet: always use full screen.
+        if ($devicetype === core_useragent::DEVICETYPE_MOBILE || $devicetype === core_useragent::DEVICETYPE_TABLET) {
+            return constants::LTI_LAUNCH_CONTAINER_REPLACE_MOODLE_WINDOW;
+        }
+
+        // Link has explicit non-default value: use it.
+        $launchcontainerInt = (int) $launchcontainer;
+        if (!empty($launchcontainer) && $launchcontainerInt != constants::LTI_LAUNCH_CONTAINER_DEFAULT) {
+            return $launchcontainerInt;
+        }
+
+        // Delegate to tool config.
+        $toolconfig = !empty($toolid) ? \core_ltix\helper::get_type_config($toolid) : [];
+        if (isset($toolconfig['launchcontainer']) && (int) $toolconfig['launchcontainer'] != constants::LTI_LAUNCH_CONTAINER_DEFAULT) {
+            return (int) $toolconfig['launchcontainer'];
+        }
+
+        // Fallback.
+        return constants::LTI_LAUNCH_CONTAINER_EMBED_NO_BLOCKS;
+    }
 
     /**
      * Creates a resource link from a DTO.
@@ -103,7 +137,13 @@ class resource_link_service {
 
         $resourcelink->create();
 
-        // Return DTO with id set.
+        // Compute effective launch container.
+        $effectiveLaunchContainer = $this->compute_effective_launchcontainer(
+            $dto->launchcontainer,
+            $dto->toolid
+        );
+
+        // Return DTO with id set and effective launch container computed.
         return new resource_link_dto(
             $dto->external_identifier,
             (int) $resourcelink->get('id'),
@@ -115,7 +155,8 @@ class resource_link_service {
             $dto->gradable,
             $dto->launchcontainer,
             $dto->customparams,
-            $dto->icon
+            $dto->icon,
+            $effectiveLaunchContainer
         );
     }
 
@@ -139,6 +180,12 @@ class resource_link_service {
             (int) $resourcelink->get('contextid')
         );
 
+        // Compute effective launch container.
+        $effectiveLaunchContainer = $this->compute_effective_launchcontainer(
+            $resourcelink->get('launchcontainer'),
+            (int) $resourcelink->get('typeid')
+        );
+
         return resource_link_dto::from_persistent(
             $identifier,
             (int) $resourcelink->get('id'),
@@ -150,7 +197,8 @@ class resource_link_service {
             (bool) $resourcelink->get('gradable'),
             $resourcelink->get('launchcontainer'),
             $resourcelink->get('customparams'),
-            $resourcelink->get('icon')
+            $resourcelink->get('icon'),
+            $effectiveLaunchContainer
         );
     }
 
@@ -186,6 +234,12 @@ class resource_link_service {
 
         $resourcelink->update();
 
+        // Compute effective launch container from updated values.
+        $effectiveLaunchContainer = $this->compute_effective_launchcontainer(
+            $updatedata['launchcontainer'] ?? $resourcelink->get('launchcontainer'),
+            $dto->toolid
+        );
+
         // Return updated DTO with id and external_identifier.
         return new resource_link_dto(
             $dto->external_identifier,
@@ -198,7 +252,8 @@ class resource_link_service {
             $updatedata['gradable'] ?? (bool) $resourcelink->get('gradable'),
             $updatedata['launchcontainer'] ?? $resourcelink->get('launchcontainer'),
             $updatedata['customparams'] ?? $resourcelink->get('customparams'),
-            $updatedata['icon'] ?? $resourcelink->get('icon')
+            $updatedata['icon'] ?? $resourcelink->get('icon'),
+            $effectiveLaunchContainer
         );
     }
 

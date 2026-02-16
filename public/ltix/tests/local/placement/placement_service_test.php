@@ -89,12 +89,10 @@ final class placement_service_test extends \advanced_testcase {
             title: 'Link title',
             launchcontainer: $linklaunchcontainer ?? null,
         );
-        $linkDto = \core\di::get(resource_link_service::class)->create_resource_link($dto);
-        // Get the persistent object for use with placement_service
-        $link = (new \core_ltix\local\lticore\models\resource_link())->get_record(['id' => $linkDto->id]);
+        $service = new \core_ltix\local\placement\service\resource_link_service();
+        $linkDto = $service->create_resource_link($dto);
 
-        $launchcontainer = placement_service::get_launch_container_for_link($link);
-        $this->assertEquals($expected, $launchcontainer);
+        $this->assertEquals($expected, $linkDto->effective_launchcontainer);
     }
 
     /**

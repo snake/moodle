@@ -43,6 +43,7 @@ final class resource_link_dto {
         public readonly ?int $launchcontainer = null,
         public readonly ?string $customparams = null,
         public readonly ?string $icon = null,
+        public readonly int $effective_launchcontainer = \core_ltix\constants::LTI_LAUNCH_CONTAINER_EMBED_NO_BLOCKS,
     ) {
         if ($title === '') {
             throw new \coding_exception('Title cannot be empty');
@@ -141,6 +142,7 @@ final class resource_link_dto {
      * @param int|null $launchcontainer
      * @param string|null $customparams
      * @param string|null $icon
+     * @param int $effective_launchcontainer
      * @return self
      */
     public static function from_persistent(
@@ -154,7 +156,8 @@ final class resource_link_dto {
         bool $gradable = false,
         ?int $launchcontainer = null,
         ?string $customparams = null,
-        ?string $icon = null
+        ?string $icon = null,
+        int $effective_launchcontainer = \core_ltix\constants::LTI_LAUNCH_CONTAINER_EMBED_NO_BLOCKS
     ): self {
         return new self(
             $external_identifier,
@@ -167,7 +170,8 @@ final class resource_link_dto {
             $gradable,
             $launchcontainer,
             $customparams,
-            $icon
+            $icon,
+            $effective_launchcontainer
         );
     }
 
