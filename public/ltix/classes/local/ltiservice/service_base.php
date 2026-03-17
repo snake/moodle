@@ -26,6 +26,9 @@
 
 namespace core_ltix\local\ltiservice;
 
+use core_ltix\local\lticore\message\context\collection\launch_context;
+use core_ltix\local\lticore\models\resource_link;
+use JetBrains\PhpStorm\Deprecated;
 use stdClass;
 
 
@@ -341,8 +344,27 @@ abstract class service_base {
      *
      * @return array Key/value pairs to add as launch parameters.
      */
+    #[\core\attribute\deprecated(
+        '::get_launch_params',
+        since: '5.3',
+        reason: 'get_launch_parameters() is deprecated. Please use get_launch_params() instead.',
+        mdl: 'MDL-79109'
+    )]
     public function get_launch_parameters($messagetype, $courseid, $userid, $typeid, $modlti = null) {
         return array();
+    }
+
+    /**
+     * Return an array of key/values to add to the launch parameters.
+     *
+     * Services requiring certain context objects for the given message type should indicate this in their implementation, via:
+     * $launchcontext->require(context_class::class)
+     *
+     * @param launch_context $launchcontext a launch context instance.
+     * @return array Key/value pairs to add as launch parameters.
+     */
+    public function get_launch_params(launch_context $launchcontext): array {
+        return [];
     }
 
     /**
@@ -388,6 +410,19 @@ abstract class service_base {
 
         return $value;
 
+    }
+
+    final public function parse_val(string $value, launch_context $launchcontext): string {
+        if (empty($this->resources)) {
+            $this->resources = $this->get_resources();
+        }
+        if (!empty($this->resources)) {
+            foreach ($this->resources as $resource) {
+                $value = $resource->parse_val($value, $launchcontext);
+            }
+        }
+
+        return $value;
     }
 
     /**
